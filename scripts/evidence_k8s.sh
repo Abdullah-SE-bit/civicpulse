@@ -94,40 +94,58 @@ run k rollout status deploy/redis --timeout=120s
 for _ in $(seq 1 40); do curl -fsS http://127.0.0.1:18000/ready >/dev/null 2>&1 && break; sleep 3; done
 check "ready again after redis returns" curl -fsS http://127.0.0.1:18000/ready
 
-say "6. HPA under load (k6 open model; cluster + k6 share one runner)"
+run_load() { # run_load <label>: one k6 run with a 2 s timeline of HPA + Deployment state, chart and lag numbers in out/<label>/
+  local label=$1 dir=out/$1
+  mkdir -p "$dir"
+  kubectl -n "$NS" get hpa backend -w > "$dir/hpa-watch.txt" 2>&1 & WATCH_PID=$!
+  echo "epoch,current,desired,ready,cpu_pct,spec" > "$dir/timeline.csv"
+  ( while true; do
+      e=$(date +%s)
+      h=$(kubectl -n "$NS" get hpa backend -o jsonpath='{.status.currentReplicas},{.status.desiredReplicas},{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null)
+      d=$(kubectl -n "$NS" get deploy backend -o jsonpath='{.status.readyReplicas},{.spec.replicas}' 2>/dev/null)
+      IFS=, read -r cur des cpu <<<"$h"; IFS=, read -r rdy spec <<<"$d"
+      echo "$e,${cur:-0},${des:-0},${rdy:-0},${cpu:-},${spec:-0}" >> "$dir/timeline.csv"
+      sleep 2
+    done ) & SAMPLER_PID=$!
+  sleep 10
+  echo "k6 start: $(date -u +%FT%TZ) HIGH_RPS=${HIGH_RPS:-120} HOLD=${HOLD:-240s}"
+  HIGH_RPS=${HIGH_RPS:-120} HOLD=${HOLD:-240s} k6 run --out csv="$dir/k6-full.csv" --summary-export "$dir/k6-summary.json" load/k6-script.js 2>&1     | grep -vE "^s*$|^(running|hpa_probe)" | tail -32
+  echo "k6 end:   $(date -u +%FT%TZ)"
+  sleep 20
+  kill "$SAMPLER_PID" "$WATCH_PID" 2>/dev/null; SAMPLER_PID=; WATCH_PID=
+  grep -E "^(metric_name|http_reqs)," "$dir/k6-full.csv" > "$dir/k6.csv"; rm -f "$dir/k6-full.csv"
+  echo "-- kubectl get hpa -w (captured; it prints a row when a value changes)"; cat "$dir/hpa-watch.txt"
+  echo "-- HPA events"; k describe hpa backend | sed -n '/Events:/,$p'
+  run kubectl top pods -n "$NS"
+  ( cd "$dir" && python3 ../../scripts/plot_hpa.py ) 2>&1
+  check "$label: chart produced from measured data" test -s "$dir/hpa-replicas-vs-load.png"
+}
+
+say "6. HPA under load, run 1 (initial requests; k6 open model; cluster + k6 share one runner)"
 echo "runner: $(nproc) vCPU, $(free -m | awk '/Mem:/{print $2}') MB RAM"
 run k get hpa backend -o yaml
-kubectl -n "$NS" get hpa backend -w > out/hpa-watch.txt 2>&1 & WATCH_PID=$!
-echo "epoch,current,desired,ready,cpu_pct" > out/timeline.csv
-( while true; do
-    e=$(date +%s)
-    h=$(kubectl -n "$NS" get hpa backend -o jsonpath='{.status.currentReplicas},{.status.desiredReplicas},{.status.currentMetrics[0].resource.current.averageUtilization}' 2>/dev/null)
-    r=$(kubectl -n "$NS" get deploy backend -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
-    IFS=, read -r cur des cpu <<<"$h"
-    echo "$e,${cur:-0},${des:-0},${r:-0},${cpu:-}" >> out/timeline.csv
-    sleep 2
-  done ) & SAMPLER_PID=$!
-sleep 10
-echo "k6 start: $(date -u +%FT%TZ) HIGH_RPS=${HIGH_RPS:-120} HOLD=${HOLD:-240s}"
-HIGH_RPS=${HIGH_RPS:-120} HOLD=${HOLD:-240s} k6 run --out csv=out/k6-full.csv --summary-export out/k6-summary.json load/k6-script.js 2>&1 | grep -vE "^\s*$" | tail -40
-echo "k6 end:   $(date -u +%FT%TZ)"
-sleep 20
-kill "$SAMPLER_PID" "$WATCH_PID" 2>/dev/null; SAMPLER_PID=; WATCH_PID=
-grep -E "^(metric_name|http_reqs)," out/k6-full.csv > out/k6.csv; rm -f out/k6-full.csv
-echo "-- kubectl get hpa -w (captured, first/last 40 lines)"; head -40 out/hpa-watch.txt; echo ...; tail -5 out/hpa-watch.txt
-echo "-- HPA events"; run k describe hpa backend | sed -n '/Events:/,$p'
-run kubectl top pods -n "$NS"
-run k get pods -l app=backend
-( cd out && python3 ../scripts/plot_hpa.py ) 2>&1
-check "chart produced from measured data" test -s out/hpa-replicas-vs-load.png
+echo "backend resources before: $(k get deploy backend -o jsonpath='{.spec.template.spec.containers[0].resources}')"
+run_load run1
 
 say "7. VPA recommendation (recommender mode, updateMode Off)"
 if kubectl get crd verticalpodautoscalers.autoscaling.k8s.io >/dev/null 2>&1; then
   run kubectl apply -f k8s/optional/vpa.yaml
-  echo "(waiting for the recommender; it needs a few minutes of samples)"
+  echo "(waiting for the recommender)"
   for _ in $(seq 1 30); do k get vpa backend-vpa -o jsonpath='{.status.recommendation}' 2>/dev/null | grep -q target && break; sleep 20; done
   run k describe vpa backend-vpa
   echo "-- requests we guessed in k8s/base/backend.yaml:"; k get deploy backend -o jsonpath='{.spec.template.spec.containers[0].resources}'; echo
+  TARGET_CPU=$(k get vpa backend-vpa -o json | jq -r '.status.recommendation.containerRecommendations[0].target.cpu // empty')
+  if [ -n "$TARGET_CPU" ]; then
+    say "8. apply the recommended CPU request, reset replicas, run the load again"
+    echo "VPA target cpu = $TARGET_CPU (memory is not changed: see the write-up)"
+    run k set resources deploy/backend -c backend --requests=cpu="$TARGET_CPU"
+    run k scale deploy/backend --replicas=2
+    run k rollout status deploy/backend --timeout=240s
+    sleep 45
+    echo "backend resources now: $(k get deploy backend -o jsonpath='{.spec.template.spec.containers[0].resources}')"
+    run_load run2
+    echo "-- lag numbers, run 1 vs run 2"; for r in run1 run2; do echo "[$r]"; cat out/$r/lag.txt; done
+  fi
 else
   echo "VPA CRD not installed on this cluster; skipped (no recommendation exists, none is claimed)"
 fi

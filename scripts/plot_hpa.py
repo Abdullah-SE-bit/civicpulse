@@ -7,6 +7,7 @@ Outputs: rps.csv, hpa-replicas-vs-load.png, lag.txt
 """
 
 import csv
+import os
 import sys
 from collections import Counter
 
@@ -22,6 +23,7 @@ t = [int(r["epoch"]) for r in rows]
 current = [int(r["current"] or 0) for r in rows]
 desired = [int(r["desired"] or 0) for r in rows]
 ready = [int(r["ready"] or 0) for r in rows]
+spec = [int(r.get("spec") or 0) for r in rows]
 cpu = [float(r["cpu_pct"]) if r["cpu_pct"] not in ("", "<none>") else None for r in rows]
 
 per_sec = Counter()
@@ -35,23 +37,26 @@ with open("rps.csv", "w") as f:
         f.write(f"{k},{per_sec[k]}\n")
 
 peak = max(per_sec.values())
-# Load "arrives" at the first second the offered rate reaches half of its peak.
-t_load = min(k for k, v in per_sec.items() if v >= peak / 2)
+target = float(os.environ.get("HIGH_RPS", "120"))
+# Load "arrives" at the first second the offered rate reaches half of the configured target rate.
+t_load = min(k for k, v in per_sec.items() if v >= target / 2)
 
 
 def first(cond):
-    for ts, *vals in zip(t, current, desired, ready):
+    for ts, *vals in zip(t, current, desired, ready, spec):
         if ts >= t_load and cond(*vals):
             return ts
     return None
 
 
-t_desired = first(lambda c, d, r: d > MIN_REPLICAS)
-t_current = first(lambda c, d, r: c > MIN_REPLICAS)
-t_ready = first(lambda c, d, r: r > MIN_REPLICAS)
+t_desired = first(lambda c, d, r, s: d > MIN_REPLICAS)
+t_spec = first(lambda c, d, r, s: s > MIN_REPLICAS)
+t_current = first(lambda c, d, r, s: c > MIN_REPLICAS)
+t_ready = first(lambda c, d, r, s: r > MIN_REPLICAS)
 lines = [
-    f"offered load: peak {peak} req/s; half-peak first reached at epoch {t_load}",
+    f"offered load: configured target {target:.0f} req/s, measured per-second peak {peak} req/s; half the target first reached at epoch {t_load}",
     f"HPA desiredReplicas > {MIN_REPLICAS}: {t_desired and t_desired - t_load} s after load arrived",
+    f"Deployment spec.replicas > {MIN_REPLICAS} (scale actually applied): {t_spec and t_spec - t_load} s after load arrived",
     f"HPA currentReplicas > {MIN_REPLICAS}: {t_current and t_current - t_load} s after load arrived",
     f"Deployment readyReplicas > {MIN_REPLICAS}: {t_ready and t_ready - t_load} s after load arrived",
     f"max replicas observed: {max(current)}",
@@ -69,6 +74,7 @@ ax1.set_ylabel("requests per second", color="tab:blue")
 ax2 = ax1.twinx()
 ax2.step([x - t0 for x in t], current, where="post", color="tab:red", label="HPA currentReplicas")
 ax2.step([x - t0 for x in t], ready, where="post", color="tab:green", linestyle="--", label="Deployment readyReplicas")
+ax2.step([x - t0 for x in t], spec, where="post", color="black", linewidth=0.8, label="Deployment spec.replicas")
 ax2.step([x - t0 for x in t], desired, where="post", color="tab:orange", linestyle=":", label="HPA desiredReplicas")
 ax2.set_ylabel("backend replicas")
 ax2.set_ylim(0, max(current + desired) + 1)
