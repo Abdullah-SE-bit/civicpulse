@@ -32,6 +32,9 @@ pythonpath = ["."]
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
 [tool.mypy]
 strict = true
 files = ["app"]
