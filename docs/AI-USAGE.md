@@ -9,6 +9,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | scripts/evidence_compose.sh, evidence workflow, docs/evidence/compose-* | Wrote the evidence script and workflow, read the runner transcript, tightened checks I found weak, wrote the summary from the real output | _pending review_ (results are from one CI run on a GitHub runner) |
 | 2026-09-25 | Claude Code / BETA | backend/Dockerfile | Added PYTHONPATH=/app after reading the failing integration job logs | _pending review_ (confirmed only by the CI rerun) |
 | 2026-09-25 | Claude Code / BETA | backend/Dockerfile, frontend/Dockerfile | Bumped base image tags and added OS package upgrades after reading the Trivy report from CI | _pending review_ (fix confirmed only by the CI rerun) |
 | 2026-09-25 | Claude Code / BETA | docs/evidence/merge-conflict.md, .mailmap | Wrote the conflict write-up from git history; added a mailmap that merges duplicate author names | _pending review_ |
