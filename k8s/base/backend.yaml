@@ -19,7 +19,8 @@ spec:
         # transactional DDL on Postgres makes that safe enough here, move to a Job if migrations get long.
         - name: migrate
           image: ghcr.io/abdullah-se-bit/civicpulse-backend:latest # overlays pin the tag
-          command: ["alembic", "upgrade", "head"]
+          # `command` replaces the image ENTRYPOINT, so this is the only place migrations and the idempotent seed run.
+          command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
           envFrom:
             - configMapRef: { name: civicpulse-config }
             - secretRef: { name: civicpulse-secrets }
@@ -30,6 +31,9 @@ spec:
           envFrom:
             - configMapRef: { name: civicpulse-config }
             - secretRef: { name: civicpulse-secrets }
+          env: # entrypoint.sh would otherwise migrate and seed again in every replica
+            - { name: RUN_MIGRATIONS, value: "false" }
+            - { name: SEED_ON_START, value: "false" }
           securityContext: { allowPrivilegeEscalation: false }
           # Slow start is not failure: this is what stops restart loops on boot.
           startupProbe:

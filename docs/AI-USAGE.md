@@ -9,6 +9,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | CI, k8s and compose defaults | Fixed the Trivy action tag, moved migrations+seed to the k8s init container, changed default triage provider to rules, removed empty-string env overrides | _pending review_ (found by reading CI logs and the backend factory/entrypoint; k8s changes not applied to a cluster) |
 | 2026-09-25 | Claude Code / BETA | frontend eslint config and component tests | Added eslint, 7 component/client tests, refactored Dashboard fetch effect to fix a lint error | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/ROLLBACK.md | Wrote the rollback runbook | _pending review_ (commands not run: no cluster available) |
 | 2026-09-24 | Claude Code / BETA | k8s/ manifests, cd.yml, release.yml, scripts/kind-config.yaml, notes Q6 | Wrote Kustomize base + overlays, optional VPA, CD and release workflows | _pending review_ (YAML parse only; no cluster, kubectl or runner available) |

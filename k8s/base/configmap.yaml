@@ -6,7 +6,6 @@ data:
   POSTGRES_DB: civicpulse
   POSTGRES_USER: civicpulse
   REDIS_URL: redis://redis:6379/0
-  TRIAGE_PROVIDER: llm # falls back to rules on failure; use "simulated" for deterministic smoke tests
-  LLM_BASE_URL: https://api.groq.com/openai/v1
-  LLM_MODEL: ""
-  OLLAMA_BASE_URL: ""
+  # "rules" works with no key. "llm" needs LLM_API_KEY in the Secret (factory.py refuses to start without it) and
+  # then falls back to rules on failure. Do not add empty-string keys here: an empty value overrides the code default.
+  TRIAGE_PROVIDER: rules

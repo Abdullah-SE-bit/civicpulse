@@ -1,6 +1,7 @@
 // Hand-written client for the contract in the assignment (§2.2). Same-origin "/api": nginx (prod) or the
 // Vite proxy (dev) forwards it, so no backend URL is baked into the bundle.
-// TODO: check these types against the backend's /openapi.json once the backend lands.
+// Sync strategy: hand-mirrored from backend/app/schemas.py and app/domain.py (compared field by field on 2026-09-25).
+// Nothing enforces this automatically yet; the tests mock responses. Regenerate from /openapi.json if the API changes.
 
 export type Category = "water" | "electricity" | "sanitation" | "roads" | "streetlights" | "other";
 export type Priority = "high" | "normal" | "low";
