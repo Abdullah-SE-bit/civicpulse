@@ -1,4 +1,4 @@
-# ADR 0001: Frontend reaches the API through an nginx `/api` proxy
+# ADR 0002: Frontend reaches the API through an nginx `/api` proxy
 
 Status: accepted
 

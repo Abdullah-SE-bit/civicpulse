@@ -8,5 +8,7 @@ data:
   REDIS_URL: redis://redis:6379/0
   TRIAGE_PROVIDER: llm # falls back to rules on failure; use "simulated" for deterministic smoke tests
   LLM_BASE_URL: https://api.groq.com/openai/v1
-  LLM_MODEL: ""
-  OLLAMA_BASE_URL: ""
+  LLM_MODEL: "" # empty means the backend default
+  OLLAMA_BASE_URL: "" # empty means http://ollama:11434
+  RUN_MIGRATIONS: "true" # read by the init container only; the serving container overrides it to false
+  SEED_ON_START: "true" # idempotent sample data; set "false" for a real deployment

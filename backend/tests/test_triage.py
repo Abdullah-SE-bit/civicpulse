@@ -163,9 +163,25 @@ def test_factory_selects_provider_and_requires_key():
     assert build_provider({}).name == "simulated"
     assert build_provider({"TRIAGE_PROVIDER": "llm", "LLM_API_KEY": "k"}).name == "llm:groq"
     with pytest.raises(ValueError):
-        build_provider({"TRIAGE_PROVIDER": "llm"})
-    with pytest.raises(ValueError):
         build_provider({"TRIAGE_PROVIDER": "nope"})
+
+
+def test_llm_without_key_degrades_to_rules_instead_of_crashing():
+    assert build_provider({"TRIAGE_PROVIDER": "llm", "LLM_API_KEY": ""}).name == "rules"
+
+
+def test_empty_env_values_mean_use_the_default():
+    env = {"TRIAGE_PROVIDER": "llm", "LLM_API_KEY": "k", "LLM_MODEL": "", "LLM_BASE_URL": "", "LLM_VENDOR": ""}
+    p = build_provider(env)
+    assert p._model == "llama-3.1-8b-instant" and p._url == "https://api.groq.com/openai/v1/chat/completions"
+    assert p.name == "llm:groq"
+    o = build_provider({"TRIAGE_PROVIDER": "ollama", "OLLAMA_BASE_URL": "", "OLLAMA_MODEL": ""})
+    assert o._url == "http://ollama:11434/api/chat"
+
+
+def test_unknown_llm_vendor_is_rejected_because_the_db_would_reject_it():
+    with pytest.raises(ValueError, match="LLM_VENDOR"):
+        build_provider({"TRIAGE_PROVIDER": "llm", "LLM_API_KEY": "k", "LLM_VENDOR": "openrouter"})
 
 
 def test_result_schema_bounds():
