@@ -1,0 +1,34 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig*
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# node
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# editors / os
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# local artefacts
+*.log
+k8s/**/secret.local.yaml
