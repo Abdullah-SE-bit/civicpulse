@@ -16,7 +16,7 @@ import redis as redis_lib
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 
 from alembic import command
 from app.config import Settings
@@ -110,7 +110,8 @@ def test_postgres_enforces_the_constraints(pg, over):
     }
     row.update(over)
     cols, vals = ", ".join(row), ", ".join(f":{k}" for k in row)
-    with pytest.raises(IntegrityError), pg.begin() as conn:
+    # Postgres rejects an over-long varchar as DataError before any CHECK runs; everything else is an IntegrityError.
+    with pytest.raises((IntegrityError, DataError)), pg.begin() as conn:
         conn.execute(text(f"INSERT INTO complaints ({cols}) VALUES ({vals})"), row)
 
 
