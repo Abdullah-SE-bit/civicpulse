@@ -7,7 +7,7 @@ Answers to the eight questions in assignment §5.2, with file-and-line reference
 3. Build-once-deploy-many line: TODO
 4. What "correct" means for a probabilistic LLM component; keeping CI deterministic: TODO
 5. HPA lag (measured): TODO
-6. Why VPA is in Off mode: TODO
+6. Why VPA is in Off mode: HPA on CPU and VPA in Auto mode both act on the CPU request and fight (VPA raises the request, utilisation drops, HPA scales in, per-pod load rises, VPA raises again). VPA runs recommender-only; we read `kubectl describe vpa backend-vpa` and change requests ourselves. (k8s/optional/vpa.yaml)
 7. `internal: true` network vs a hosted LLM call: the backend is the only service on both networks, so it keeps a route out via `edge` and calls the hosted LLM itself. Postgres and Redis stay internal-only. The alternative (a dedicated egress proxy service on both networks) adds a moving part with no gain here. Ollama sits on `edge` because it must download model weights. (compose.yaml)
 8. The failure that cost more than an hour: TODO
 

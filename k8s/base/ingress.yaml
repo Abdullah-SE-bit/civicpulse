@@ -1,0 +1,12 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: civicpulse
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: civicpulse.localtest.me # resolves to 127.0.0.1, so it works on kind/k3d without editing hosts
+      http:
+        paths:
+          - { path: /api, pathType: Prefix, backend: { service: { name: backend, port: { number: 8000 } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: frontend, port: { number: 80 } } } }
