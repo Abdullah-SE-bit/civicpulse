@@ -1,12 +1,14 @@
-FROM python:3.12.8-slim-bookworm AS builder
+FROM python:3.12.14-slim-bookworm AS builder
 WORKDIR /build
 # Only pyproject.toml is copied here, so this layer is rebuilt when dependencies change, not on every source edit.
 COPY pyproject.toml .
 RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > requirements.txt \
  && pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-FROM python:3.12.8-slim-bookworm
+FROM python:3.12.14-slim-bookworm
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+# Pick up Debian security fixes published after the base image was built (Trivy gates on HIGH/CRITICAL with a fix).
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --no-create-home app
 WORKDIR /app
 COPY --from=builder /install /usr/local

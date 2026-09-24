@@ -9,6 +9,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | backend/Dockerfile, frontend/Dockerfile | Bumped base image tags and added OS package upgrades after reading the Trivy report from CI | _pending review_ (fix confirmed only by the CI rerun) |
 | 2026-09-25 | Claude Code / BETA | docs/evidence/merge-conflict.md, .mailmap | Wrote the conflict write-up from git history; added a mailmap that merges duplicate author names | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | frontend/nginx.conf | Restored gzip lost in a merge-conflict resolution; added text/javascript to gzip_types (nginx not run locally) | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | README, docs/RUNBOOK.md, docs/adr/0002+0003, ENGINEERING-NOTES Q1-3,5 | Wrote from the actual code, workflows and manifests; left measurements as explicitly not done | _pending review_ (commands in the RUNBOOK have not been run) |

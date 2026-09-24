@@ -7,7 +7,11 @@ COPY . .
 RUN npm run build
 
 # Serve stage: static files only, non-root (nginx-unprivileged listens on 8080).
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.27.5-alpine
+# Same reason as the backend: take Alpine security fixes newer than the base image, then drop back to the nginx user.
+USER root
+RUN apk upgrade --no-cache
+USER 101
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080
