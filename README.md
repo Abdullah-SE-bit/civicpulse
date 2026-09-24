@@ -19,6 +19,8 @@ See `backend/`, `frontend/`, `k8s/`, `load/`, `docs/`, `scripts/`, `.github/work
 - Abdullah-SE-bit: backend, data, AI layer, architecture
 - rayyanhasan899: frontend, containers, Kubernetes, CI, documentation
 
+Rollback procedures: [docs/ROLLBACK.md](docs/ROLLBACK.md).
+
 AI assistance is disclosed in [docs/AI-USAGE.md](docs/AI-USAGE.md).
 
 ## License
