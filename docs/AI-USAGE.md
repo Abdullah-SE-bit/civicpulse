@@ -17,6 +17,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | 2026-09-24 | Claude Code / BETA | Frontend (React+Vite+TS), nginx.conf, frontend Dockerfile, ADR 0001 | Wrote all frontend source, client, one validation test, Dockerfile, nginx config, ADR | _pending review_ (image build not yet run: Docker unavailable locally) |
 
 | 2026-09-24 | Claude Code / ALPHA | Backend triage layer | Providers (rules, simulated, LLM, Ollama), factory, TriageService (retry, fallback, cache), tests | _pending review by BETA_ |
+| 2026-09-25 | Claude Code / ALPHA | Backend data layer | Domain enums and state machine, models, Alembic migration, repository, ComplaintService, idempotent seed, backend Dockerfile and entrypoint, tests | _pending review by BETA_ |
 
 
 
