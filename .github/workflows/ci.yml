@@ -116,7 +116,7 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
       - if: steps.present.outputs.yes == 'true'
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: civicpulse-${{ matrix.image }}:ci
           severity: HIGH,CRITICAL
