@@ -24,7 +24,7 @@ def build_provider(env: Mapping[str, str] | None = None) -> TriageProvider:
     env = os.environ if env is None else env
     kind = _get(env, "TRIAGE_PROVIDER", "simulated").lower()
     if kind == "simulated":
-        return SimulatedTriage()
+        return SimulatedTriage(latency_ms=int(_get(env, "SIMULATED_LATENCY_MS", "0")))
     if kind == "rules":
         return RuleBasedTriage()
     if kind == "ollama":

@@ -184,6 +184,11 @@ def test_unknown_llm_vendor_is_rejected_because_the_db_would_reject_it():
         build_provider({"TRIAGE_PROVIDER": "llm", "LLM_API_KEY": "k", "LLM_VENDOR": "openrouter"})
 
 
+def test_simulated_latency_is_configurable_for_shutdown_tests():
+    p = build_provider({"TRIAGE_PROVIDER": "simulated", "SIMULATED_LATENCY_MS": "1"})
+    assert p.latency_ms == 1 and p.triage(TEXT, LOC).category
+
+
 def test_result_schema_bounds():
     with pytest.raises(ValueError):
         TriageResult(category="water", priority="high", summary="x" * 141, confidence=0.5)
