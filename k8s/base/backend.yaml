@@ -15,11 +15,13 @@ spec:
     spec:
       terminationGracePeriodSeconds: 30
       initContainers:
-        # Schema comes from Alembic only. ponytail: concurrent replicas race on `upgrade head`; Alembic's
-        # transactional DDL on Postgres makes that safe enough here, move to a Job if migrations get long.
+        # Migrations and the idempotent seed run here, once per rollout, and never in the serving containers:
+        # entrypoint.sh runs `alembic upgrade head` then the seed, then exits via `true`. ponytail: replicas of
+        # one rollout can still race on `upgrade head`; Alembic's transactional DDL on Postgres makes that safe
+        # enough here, move to a Job if migrations get long.
         - name: migrate
           image: ghcr.io/abdullah-se-bit/civicpulse-backend:latest # overlays pin the tag
-          command: ["alembic", "upgrade", "head"]
+          command: ["./entrypoint.sh", "true"]
           envFrom:
             - configMapRef: { name: civicpulse-config }
             - secretRef: { name: civicpulse-secrets }
@@ -30,6 +32,10 @@ spec:
           envFrom:
             - configMapRef: { name: civicpulse-config }
             - secretRef: { name: civicpulse-secrets }
+          env:
+            # The image entrypoint would otherwise migrate and seed on every pod start.
+            - { name: RUN_MIGRATIONS, value: "false" }
+            - { name: SEED_ON_START, value: "false" }
           securityContext: { allowPrivilegeEscalation: false }
           # Slow start is not failure: this is what stops restart loops on boot.
           startupProbe:
