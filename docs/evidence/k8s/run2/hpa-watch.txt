@@ -1,0 +1,27 @@
+NAME      REFERENCE            TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+backend   Deployment/backend   cpu: <unknown>/60%   2         10        2          9m44s
+backend   Deployment/backend   cpu: 1%/60%          2         10        2          9m45s
+backend   Deployment/backend   cpu: 3%/60%          2         10        2          10m
+backend   Deployment/backend   cpu: 11%/60%         2         10        2          10m
+backend   Deployment/backend   cpu: 14%/60%         2         10        2          10m
+backend   Deployment/backend   cpu: 107%/60%        2         10        2          11m
+backend   Deployment/backend   cpu: 193%/60%        2         10        4          11m
+backend   Deployment/backend   cpu: 206%/60%        2         10        7          11m
+backend   Deployment/backend   cpu: 132%/60%        2         10        7          11m
+backend   Deployment/backend   cpu: 80%/60%         2         10        7          12m
+backend   Deployment/backend   cpu: 61%/60%         2         10        9          12m
+backend   Deployment/backend   cpu: 65%/60%         2         10        9          12m
+backend   Deployment/backend   cpu: 53%/60%         2         10        9          12m
+backend   Deployment/backend   cpu: 50%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 52%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 50%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 50%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 45%/60%         2         10        9          15m
+backend   Deployment/backend   cpu: 18%/60%         2         10        9          15m
+backend   Deployment/backend   cpu: 4%/60%          2         10        9          15m
+backend   Deployment/backend   cpu: 4%/60%          2         10        9          15m
+backend   Deployment/backend   cpu: 4%/60%          2         10        9          16m
