@@ -9,6 +9,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | CI, k8s and compose defaults | Fixed the Trivy action tag, moved migrations+seed to the k8s init container, changed default triage provider to rules, removed empty-string env overrides | _pending review_ (found by reading CI logs and the backend factory/entrypoint; k8s changes not applied to a cluster) |
 | 2026-09-25 | Claude Code / BETA | frontend eslint config and component tests | Added eslint, 7 component/client tests, refactored Dashboard fetch effect to fix a lint error | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/ROLLBACK.md | Wrote the rollback runbook | _pending review_ (commands not run: no cluster available) |
 | 2026-09-24 | Claude Code / BETA | k8s/ manifests, cd.yml, release.yml, scripts/kind-config.yaml, notes Q6 | Wrote Kustomize base + overlays, optional VPA, CD and release workflows | _pending review_ (YAML parse only; no cluster, kubectl or runner available) |
@@ -18,6 +19,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | 2026-09-24 | Claude Code / ALPHA | Backend triage layer | Providers (rules, simulated, LLM, Ollama), factory, TriageService (retry, fallback, cache), tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend data layer | Domain enums and state machine, models, Alembic migration, repository, ComplaintService, idempotent seed, backend Dockerfile and entrypoint, tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend HTTP API | FastAPI app, routes, Redis stats cache + rate limiter + triage cache, health/ready/metrics, JSON logging, API tests | _pending review by BETA_ |
+| 2026-09-25 | Claude Code / ALPHA | Backend audit fixes and docs | Factory/env handling fixes, k8s backend init-container change, extra Redis/config tests, TRIAGE.md, ADR 0001 (provider interface) and 0004 (PII), engineering notes 4 and 8 and index justifications. Also renamed the frontend ADR to 0002 to match the required ADR set. | _pending review by BETA_ |
 
 
 

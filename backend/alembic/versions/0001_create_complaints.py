@@ -41,7 +41,7 @@ def upgrade() -> None:
         sa.CheckConstraint(f"triaged_by IN {TRIAGED_BY}", name="ck_complaints_triaged_by"),
         sa.CheckConstraint("ai_summary IS NULL OR length(ai_summary) <= 140", name="ck_complaints_summary_len"),
     )
-    # Serves the dashboard filter: WHERE status = ? [AND priority = ?] and stats GROUP BY.
+    # Serves the dashboard filter: WHERE status = ? [AND priority = ?]. Not the stats GROUP BYs (cached in Redis).
     op.create_index("ix_complaints_status_priority", "complaints", ["status", "priority"])
     # Serves the dashboard ordering: ORDER BY created_at DESC LIMIT/OFFSET, and /api/meta/providers.
     op.create_index("ix_complaints_created_at", "complaints", ["created_at"])
