@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [../../base]
+# Local dev: load images with `kind load docker-image` and never pull.
+images:
+  - { name: ghcr.io/abdullah-se-bit/civicpulse-backend, newTag: dev }
+  - { name: ghcr.io/abdullah-se-bit/civicpulse-frontend, newTag: dev }
+patches:
+  - target: { kind: Deployment, name: backend|frontend }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target: { kind: ConfigMap, name: civicpulse-config }
+    patch: |-
+      - op: replace
+        path: /data/TRIAGE_PROVIDER
+        value: simulated

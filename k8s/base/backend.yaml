@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        # Schema comes from Alembic only. ponytail: concurrent replicas race on `upgrade head`; Alembic's
+        # transactional DDL on Postgres makes that safe enough here, move to a Job if migrations get long.
+        - name: migrate
+          image: ghcr.io/abdullah-se-bit/civicpulse-backend:latest # overlays pin the tag
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef: { name: civicpulse-config }
+            - secretRef: { name: civicpulse-secrets }
+      containers:
+        - name: backend
+          image: ghcr.io/abdullah-se-bit/civicpulse-backend:latest # overlays pin the tag
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom:
+            - configMapRef: { name: civicpulse-config }
+            - secretRef: { name: civicpulse-secrets }
+          securityContext: { allowPrivilegeEscalation: false }
+          # Slow start is not failure: this is what stops restart loops on boot.
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            failureThreshold: 30
+            periodSeconds: 2
+          # Restarts the pod, so it must NOT touch the database.
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 10
+          # Removes the pod from the Service, so it SHOULD depend on Postgres and Redis.
+          readinessProbe:
+            httpGet: { path: /ready, port: 8000 }
+            periodSeconds: 5
+          lifecycle:
+            # Let endpoints propagate before the app gets SIGTERM, so no request lands on a stopping pod.
+            preStop: { exec: { command: ["sleep", "10"] } }
+          resources: # HPA utilisation = usage / request: without requests.cpu the HPA sits at <unknown>
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 384Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  type: ClusterIP
+  selector: { app: backend }
+  ports: [{ port: 8000, targetPort: http }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: backend }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 60 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 300 } # scale down slowly: flapping is expensive
+    scaleUp: { stabilizationWindowSeconds: 0 } # scale up immediately: users are waiting
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app: backend }
