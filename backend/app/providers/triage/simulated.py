@@ -1,4 +1,5 @@
 import hashlib
+import time
 from typing import Literal
 
 from .base import (
@@ -18,12 +19,15 @@ class SimulatedTriage:
 
     name = "simulated"
 
-    def __init__(self, failure: FailureMode = "none") -> None:
+    def __init__(self, failure: FailureMode = "none", latency_ms: int = 0) -> None:
         self.failure = failure
+        self.latency_ms = latency_ms
         self.calls = 0
 
     def triage(self, text: str, location: str) -> TriageResult:
         self.calls += 1
+        if self.latency_ms:
+            time.sleep(self.latency_ms / 1000)
         if self.failure == "raise":
             raise TriageError("injected failure")
         if self.failure == "retryable":
