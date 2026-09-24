@@ -6,7 +6,8 @@ RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml
  && pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.12.14-slim-bookworm
-ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+# alembic runs as a console script from /usr/local/bin, so /app is not on sys.path and alembic/env.py cannot import app.
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app
 # Pick up Debian security fixes published after the base image was built (Trivy gates on HIGH/CRITICAL with a fix).
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --no-create-home app
