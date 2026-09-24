@@ -10,6 +10,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | frontend/nginx.conf | Restored gzip lost in a merge-conflict resolution; added text/javascript to gzip_types (nginx not run locally) | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | README, docs/RUNBOOK.md, docs/adr/0002+0003, ENGINEERING-NOTES Q1-3,5 | Wrote from the actual code, workflows and manifests; left measurements as explicitly not done | _pending review_ (commands in the RUNBOOK have not been run) |
 | 2026-09-25 | Claude Code / BETA | CI, k8s and compose defaults | Fixed the Trivy action tag, moved migrations+seed to the k8s init container, changed default triage provider to rules, removed empty-string env overrides | _pending review_ (found by reading CI logs and the backend factory/entrypoint; k8s changes not applied to a cluster) |
 | 2026-09-25 | Claude Code / BETA | frontend eslint config and component tests | Added eslint, 7 component/client tests, refactored Dashboard fetch effect to fix a lint error | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/ROLLBACK.md | Wrote the rollback runbook | _pending review_ (commands not run: no cluster available) |
