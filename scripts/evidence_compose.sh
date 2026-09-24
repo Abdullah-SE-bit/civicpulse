@@ -31,7 +31,7 @@ docker compose build --progress=plain 2>&1 | grep -E "transferring context|namin
 run docker image ls --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}' | grep -E "REPOSITORY|civicpulse"
 
 say "3. stack up"
-run docker compose up -d
+run docker compose up -d --quiet-pull
 check "backend becomes ready" wait_ready
 run docker compose ps
 
@@ -60,7 +60,7 @@ ID=$(echo "$created" | jq -r .id)
 check "GET complaint back" bash -c "curl -fsS $FRONT/api/complaints/$ID | jq -e '.category'"
 run curl -sS -D - -o /dev/null "$FRONT/api/stats" | grep -iE "^HTTP|x-cache"
 run curl -sS -D - -o /dev/null "$FRONT/api/stats" | grep -iE "^HTTP|x-cache"
-run curl -sS "$FRONT/api/meta/providers" | jq -c '{active, n_recent: (.recent|length), triage_cache}'
+echo '$ curl /api/meta/providers'; curl -sS "$FRONT/api/meta/providers" | jq -c '{active, n_recent: (.recent|length), triage_cache}'
 
 say "7. status transitions and 409"
 code=$(curl -sS -o /tmp/t1.json -w '%{http_code}' -X PATCH "$BACK/api/complaints/$ID/status" -H 'Content-Type: application/json' -d '{"status":"in_progress"}')
@@ -91,11 +91,14 @@ run docker network ls --format '{{.Name}}\t{{.Driver}}\tinternal={{.Internal}}' 
 for n in edge internal; do run docker network inspect "civicpulse_$n" --format '{{.Name}} internal={{.Internal}} members={{range .Containers}}{{.Name}} {{end}}'; done
 echo "-- frontend -> postgres (must fail)"; run docker compose exec -T frontend ping -c1 -W2 postgres
 check "frontend cannot reach postgres" bash -c '! docker compose exec -T frontend ping -c1 -W2 postgres'
+echo "-- frontend -> redis (must fail)"; run docker compose exec -T frontend ping -c1 -W2 redis
 check "frontend cannot reach redis" bash -c '! docker compose exec -T frontend ping -c1 -W2 redis'
 check "frontend can reach backend" docker compose exec -T frontend wget -qO- -T3 http://backend:8000/health
 check "backend can reach postgres:5432" docker compose exec -T backend python -c "import socket;socket.create_connection(('postgres',5432),3)"
 check "backend can reach redis:6379" docker compose exec -T backend python -c "import socket;socket.create_connection(('redis',6379),3)"
 echo "-- outbound from the internal network (must fail)"
+check "wget exists in the postgres image (so the next result is about the network)" docker compose exec -T postgres sh -c "command -v wget"
+run docker compose exec -T postgres sh -c "wget -T4 -O- http://example.com"
 check "postgres has no outbound route" bash -c '! docker compose exec -T postgres sh -c "wget -q -T4 -O- http://example.com"'
 check "backend has outbound route via edge" docker compose exec -T backend python -c "import urllib.request as u;u.urlopen('https://example.com',timeout=6)"
 
@@ -113,10 +116,10 @@ check "ready again after redis returns" wait_ready
 say "11. provider failure -> rules fallback (unreachable LLM endpoint, dummy key)"
 TRIAGE_PROVIDER=llm LLM_API_KEY=dummy-not-a-real-key LLM_BASE_URL=http://127.0.0.1:9/v1 run docker compose up -d --force-recreate backend
 check "backend ready with a broken provider" wait_ready
-run curl -sS "$BACK/api/meta/providers" | jq -c '{active}'
+echo '$ curl /api/meta/providers'; curl -sS "$BACK/api/meta/providers" | jq -c '{active, recent: .recent[0:3]}'
 code=$(post 'Sewer overflowing into the street near the school' 192.0.2.20); echo "POST -> HTTP $code"
 check "still 201 when the provider fails" test "$code" = 201
-run curl -sS "$BACK/api/complaints?page=1&page_size=1" | jq -c '.items[0]|{triaged_by,category,priority}'
+echo '$ curl newest complaint'; curl -sS "$BACK/api/complaints?page=1&page_size=1" | jq -c '.items[0]|{triaged_by,category,priority,ai_summary}'
 check "triaged_by is rules:fallback" bash -c "curl -fsS '$BACK/api/complaints?page=1&page_size=1' | jq -e '.items[0].triaged_by==\"rules:fallback\"'"
 run docker compose logs backend --no-log-prefix | grep -m3 "triage fallback"
 run curl -sS "$BACK/metrics" | grep -E "^triage_fallback_total"
@@ -126,27 +129,46 @@ check "backend back on the default provider" wait_ready
 say "12. persistence: down (no -v) then up"
 BEFORE=$(curl -fsS "$BACK/api/complaints?page=1&page_size=1" | jq .total); echo "total before: $BEFORE"
 run docker compose down
-run docker compose up -d
+run docker compose up -d --quiet-pull
 check "ready after down/up" wait_ready
 AFTER=$(curl -fsS "$BACK/api/complaints?page=1&page_size=1" | jq .total); echo "total after: $AFTER"
 check "row count preserved" test "$BEFORE" = "$AFTER"
 check "the created complaint still exists" bash -c "curl -fsS $BACK/api/complaints/$ID | jq -e '.id'"
 run docker volume ls --format '{{.Name}}' | grep civicpulse
 
-say "13. graceful shutdown (SIGTERM to the backend while requests are in flight)"
-( for _ in $(seq 1 200); do curl -sS -o /dev/null -w '%{http_code}\n' --max-time 3 "$BACK/api/complaints?page=1&page_size=50" 2>&1; done ) > /tmp/load.txt &
-LOADPID=$!
-sleep 1
+say "13. graceful shutdown"
 CID=$(docker compose ps -q backend)
-date +%T.%N; run docker compose kill -s SIGTERM backend
-EXIT=$(docker wait "$CID"); echo "container exit code: $EXIT"
-wait $LOADPID 2>/dev/null
-echo "response codes seen during the run:"; sort /tmp/load.txt | uniq -c
-run docker logs --tail 15 "$CID"
-check "backend exited 0 on SIGTERM" test "$EXIT" = 0
-check "no 5xx during shutdown" bash -c "! grep -qE '^5' /tmp/load.txt"
-run docker compose up -d backend
+echo "-- A. an in-flight request must survive SIGTERM: upload a ~1.2 KB body at 300 B/s (~4 s) and signal 1.5 s in"
+jq -n --arg t "$(for _ in $(seq 1 25); do printf 'Drain flooding on the main road near the school. '; done)" '{text:$t,location:"Main Road"}' > /tmp/slow.json
+wc -c /tmp/slow.json
+( code=$(curl -sS -o /tmp/slow.out -w '%{http_code}' --limit-rate 300 -X POST "$BACK/api/complaints"     -H 'Content-Type: application/json' -H 'X-Forwarded-For: 192.0.2.77' --data-binary @/tmp/slow.json);   echo "$code $(date +%s.%N)" > /tmp/slow.res ) &
+SLOWPID=$!
+sleep 1.5
+T_SIG=$(date +%s.%N); echo "SIGTERM sent at $T_SIG"
+run docker compose kill -s SIGTERM backend
+EXIT=$(docker wait "$CID"); T_EXIT=$(date +%s.%N); echo "container exit code: $EXIT at $T_EXIT"
+wait $SLOWPID 2>/dev/null
+read -r SLOW_CODE T_DONE < /tmp/slow.res
+echo "in-flight request answered HTTP $SLOW_CODE at $T_DONE"
+run docker logs --tail 6 "$CID"
+check "in-flight request completed with 201" test "$SLOW_CODE" = 201
+check "it completed after SIGTERM was sent (was really in flight)" awk -v a="$T_DONE" -v b="$T_SIG" 'BEGIN{exit !(a>b)}'
+check "backend exited 0" test "$EXIT" = 0
+run docker compose up -d --quiet-pull backend
 check "backend restarts cleanly" wait_ready
+check "the in-flight complaint was persisted" bash -c "curl -fsS $BACK/api/complaints/$(jq -r .id /tmp/slow.out) | jq -e '.id'"
+echo "-- B. new requests after SIGTERM are refused, not half-served (sequential loop)"
+( for _ in $(seq 1 150); do curl -s -o /dev/null -w '%{http_code}
+' --max-time 3 "$BACK/api/complaints?page=1&page_size=50" 2>/dev/null; done ) > /tmp/load.txt &
+LOADPID=$!
+sleep 0.7; run docker compose kill -s SIGTERM backend
+docker wait "$(docker compose ps -aq backend)" >/dev/null
+wait $LOADPID 2>/dev/null
+echo "ordered codes, run-length encoded:"; uniq -c /tmp/load.txt
+check "no success after the first failure (failures only at the tail)" awk '$1!="200"{f=1} f&&$1=="200"{bad=1} END{exit bad}' /tmp/load.txt
+check "no 5xx" bash -c "! grep -qE '^5' /tmp/load.txt"
+run docker compose up -d --quiet-pull backend
+check "backend restarts cleanly again" wait_ready
 
 say "summary"
 echo "PASS=$PASS FAIL=$FAIL"
