@@ -1,10 +1,15 @@
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models import Complaint
+
+
+class RepositoryUnavailableError(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -19,6 +24,12 @@ class ComplaintRepository:
 
     def __init__(self, session: Session) -> None:
         self._s = session
+
+    def ping(self) -> None:
+        try:
+            self._s.execute(text("SELECT 1"))
+        except SQLAlchemyError as exc:
+            raise RepositoryUnavailableError(str(exc)) from exc
 
     def add(self, complaint: Complaint) -> Complaint:
         self._s.add(complaint)

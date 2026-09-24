@@ -1,6 +1,7 @@
 import uuid
 from collections.abc import Callable
 
+from app import metrics
 from app.domain import Status, check_transition
 from app.models import Complaint
 from app.repositories.complaints import ComplaintFilter, ComplaintRepository
@@ -27,6 +28,13 @@ class ComplaintService:
     def create(self, text: str, location: str, reporter_contact: str | None) -> Complaint:
         complaint_id = uuid.uuid4()
         outcome = self._triage.triage(text, location, complaint_id=str(complaint_id))
+        metrics.observe_triage(
+            self._triage.provider_name,
+            outcome.triaged_by,
+            outcome.latency_ms,
+            outcome.fallback,
+            outcome.cache_hit,
+        )
         complaint = Complaint(
             id=complaint_id,
             text=text,
