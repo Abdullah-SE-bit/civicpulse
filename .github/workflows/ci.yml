@@ -61,7 +61,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
-          npm run lint --if-present # TODO: add eslint to the frontend (spec asks for eslint + tsc)
+          npm run lint
           npx tsc --noEmit
 
   test-backend:

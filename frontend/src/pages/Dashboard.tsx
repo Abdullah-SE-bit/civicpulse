@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CATEGORIES, PRIORITIES, STATUSES, listComplaints, setStatus,
   type ComplaintPage, type Status,
@@ -11,30 +11,29 @@ export function Dashboard() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ComplaintPage | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setData(await listComplaints({ page, page_size: PAGE_SIZE, ...filters }));
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, filters]);
+  const [reload, setReload] = useState(0); // bump to refetch after a status change
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let stale = false; // ignore a slow response that arrives after the filters changed
+    listComplaints({ page, page_size: PAGE_SIZE, ...filters })
+      .then((d) => {
+        if (stale) return;
+        setData(d);
+        setError("");
+      })
+      .catch((e: Error) => {
+        if (!stale) setError(e.message);
+      });
+    return () => {
+      stale = true;
+    };
+  }, [page, filters, reload]);
 
   // The server owns the state machine; on an invalid transition we show its 409 message verbatim.
   async function advance(id: string, status: Status) {
     try {
       await setStatus(id, status);
-      setError("");
-      await load();
+      setReload((n) => n + 1);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -65,7 +64,7 @@ export function Dashboard() {
         {filter("status", STATUSES)}
       </div>
       {error && <p role="alert" className="err">{error}</p>}
-      {loading && !data ? <p>Loading…</p> : (
+      {!data && !error ? <p>Loading…</p> : (
         <table>
           <thead>
             <tr><th>Summary</th><th>Location</th><th>Category</th><th>Priority</th><th>Status</th><th>Triaged by</th></tr>
