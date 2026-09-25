@@ -1,0 +1,65 @@
+name: evidence-rollout
+
+# Not part of the product pipeline: rolling update under load and both rollback mechanisms on kind in a runner.
+# Triggered only by pushing an evidence-rollout/** branch.
+on:
+  push:
+    branches: ["evidence-rollout/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.33.0
+          cluster_name: civicpulse
+          config: scripts/kind-config.yaml
+
+      - name: "Install ingress-nginx (no metrics-server on purpose - the HPA must not change replica counts mid-test)"
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/kind/deploy.yaml
+          kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=240s
+
+      - name: Build the image, tag it twice (same image) and load both tags into kind
+        run: |
+          docker build -t ghcr.io/abdullah-se-bit/civicpulse-backend:dev backend
+          docker build -t ghcr.io/abdullah-se-bit/civicpulse-frontend:dev frontend
+          docker tag ghcr.io/abdullah-se-bit/civicpulse-backend:dev ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+          kind load docker-image ghcr.io/abdullah-se-bit/civicpulse-backend:dev ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2 ghcr.io/abdullah-se-bit/civicpulse-frontend:dev --name civicpulse
+
+      - name: Install kustomize
+        run: |
+          curl -sSL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz | tar xz
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Apply the dev overlay
+        run: |
+          kubectl create namespace civicpulse
+          kubectl apply -f k8s/secret.example.yaml
+          kubectl apply -k k8s/overlays/dev
+          kubectl -n civicpulse rollout status statefulset/postgres --timeout=240s
+          kubectl -n civicpulse rollout status deployment/redis --timeout=120s
+          kubectl -n civicpulse rollout status deployment/backend --timeout=300s
+          kubectl -n civicpulse rollout status deployment/frontend --timeout=120s
+
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Run the rollout evidence script
+        run: |
+          chmod +x scripts/evidence_rollout.sh
+          mkdir -p out
+          set -o pipefail
+          scripts/evidence_rollout.sh 2>&1 | tee out/rollout-transcript.txt
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollout-evidence
+          path: out/

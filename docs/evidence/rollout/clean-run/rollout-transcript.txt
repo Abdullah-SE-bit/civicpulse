@@ -1,0 +1,207 @@
+
+=== environment
+$ kubectl version --short
+error: unknown flag: --short
+See 'kubectl version --help' for usage.
+$ kubectl version
+Client Version: v1.35.0
+Kustomize Version: v5.7.1
+Server Version: v1.37.0
+Warning: version difference between client (1.35) and server (1.37) exceeds the supported minor version skew of +/-1
+
+=== 0. starting state
+$ k get deploy backend -o wide
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                           SELECTOR
+backend   2/2     2            2           26s   backend      ghcr.io/abdullah-se-bit/civicpulse-backend:dev   app=backend
+strategy: {"rollingUpdate":{"maxSurge":1,"maxUnavailable":0},"type":"RollingUpdate"}
+terminationGracePeriodSeconds: 30, preStop: {"exec":{"command":["sleep","10"]}}
+image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev
+PASS  starts on the :dev tag
+
+=== 1. start k6: 25 req/s for 300 s through the Ingress
+k6 started 07:04:39 epoch=1790319879
+
+=== 2. rolling update: kubectl set image (same image, new tag dev-v2)
+t=07:04:59 epoch=1790319899
+$ k set image deployment/backend backend=ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+deployment.apps/backend image updated
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+t=07:05:12 epoch=1790319912 image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+$ k get rs -l app=backend
+NAME                 DESIRED   CURRENT   READY   AGE
+backend-548cdd8769   2         2         2       13s
+backend-6966945c84   0         0         0       59s
+PASS  rollout switched the image to dev-v2
+
+=== 3. rollback mechanism 1: kubectl rollout undo
+t=07:05:28 epoch=1790319928
+$ k rollout history deployment/backend
+deployment.apps/backend 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+$ k rollout undo deployment/backend
+deployment.apps/backend rolled back
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+t=07:05:41 epoch=1790319941 image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev
+PASS  undo restored the :dev tag
+
+=== 4. rollback mechanism 2: re-apply the overlay with an image tag (declarative)
+-- roll FORWARD by applying the overlay pinned to dev-v2 (t=07:05:56 epoch=1790319956)
+$ bash -c kustomize build . | kubectl apply -f -
+namespace/civicpulse unchanged
+configmap/civicpulse-config unchanged
+service/backend unchanged
+service/frontend unchanged
+service/postgres unchanged
+service/redis unchanged
+persistentvolumeclaim/redis-data unchanged
+deployment.apps/backend configured
+deployment.apps/frontend unchanged
+deployment.apps/redis unchanged
+statefulset.apps/postgres configured
+poddisruptionbudget.policy/backend configured
+horizontalpodautoscaler.autoscaling/backend unchanged
+ingress.networking.k8s.io/civicpulse unchanged
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+-- roll BACK by applying the overlay pinned to the previous tag dev (t=07:06:20 epoch=1790319980)
+$ bash -c kustomize build . | kubectl apply -f -
+namespace/civicpulse unchanged
+configmap/civicpulse-config unchanged
+service/backend unchanged
+service/frontend unchanged
+service/postgres unchanged
+service/redis unchanged
+persistentvolumeclaim/redis-data unchanged
+deployment.apps/backend configured
+deployment.apps/frontend unchanged
+deployment.apps/redis unchanged
+statefulset.apps/postgres configured
+poddisruptionbudget.policy/backend configured
+horizontalpodautoscaler.autoscaling/backend unchanged
+ingress.networking.k8s.io/civicpulse unchanged
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev
+PASS  declarative re-apply restored :dev
+
+=== 5. wait for k6 to finish and read its measured result
+    checks_failed......: 0.00%   0 out of 7500
+    ✓ status 200
+    HTTP
+    http_req_duration..............: avg=6.82ms min=4.38ms med=6.48ms max=87.51ms p(90)=7.82ms p(95)=8.71ms
+      { expected_response:true }...: avg=6.82ms min=4.38ms med=6.48ms max=87.51ms p(90)=7.82ms p(95)=8.71ms
+    http_req_failed................: 0.00%  0 out of 7500
+    http_reqs......................: 7500   24.999928/s
+    EXECUTION
+    iteration_duration.............: avg=7.06ms min=4.47ms med=6.72ms max=87.9ms  p(90)=8.09ms p(95)=8.99ms
+    iterations.....................: 7500   24.999928/s
+    vus............................: 0      min=0         max=1 
+    vus_max........................: 20     min=20        max=20
+    NETWORK
+    data_received..................: 71 MB  238 kB/s
+    data_sent......................: 848 kB 2.8 kB/s
+running (5m00.0s), 000/020 VUs, 7500 complete and 0 interrupted iterations
+steady ✓ [ 100% ] 000/020 VUs  5m0s  25.00 iters/s
+requests=7500 failed(http_req_failed)=0 check_failures=0 dropped=0
+{"avg_ms":6.829468470266669,"p95_ms":8.71515125,"max_ms":87.515181}
+PASS  zero failed requests during roll-forward, undo and re-apply
+-- every non-200 request k6 saw (epoch = when it completed), so failures can be placed against the phase times printed above
+0 non-200 responses
+-- ingress-nginx access log lines for /api that were not 200
+-- ingress error log (upstream problems)
+NGINX Ingress controller
+  Release:       v1.15.1
+  Build:         0df02f2cfcf5fe4ad3cf31492bca770ac2a1606a
+  Repository:    https://github.com/kubernetes/ingress-nginx
+  nginx version: nginx/1.27.1
+W0925 07:03:29.466720      14 client_config.go:682] Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.
+I0925 07:03:29.467061      14 main.go:205] "Creating API client" host="https://10.96.0.1:443"
+I0925 07:03:29.476532      14 main.go:248] "Running in Kubernetes cluster" major="1" minor="37" git="v1.37.0" state="clean" commit="f54c212e3a2f75d674b717a9b29052b20b60aefc" platform="linux/amd64"
+I0925 07:03:29.594319      14 main.go:101] "SSL fake certificate created" file="/etc/ingress-controller/ssl/default-fake-certificate.pem"
+I0925 07:03:29.602259      14 ssl.go:535] "loading tls certificate" path="/usr/local/certificates/cert" key="/usr/local/certificates/key"
+I0925 07:03:29.608070      14 nginx.go:273] "Starting NGINX Ingress controller"
+I0925 07:03:29.616097      14 event.go:377] Event(v1.ObjectReference{Kind:"ConfigMap", Namespace:"ingress-nginx", Name:"ingress-nginx-controller", UID:"52418e0b-2e36-44be-ad70-c2e60f84225a", APIVersion:"v1", ResourceVersion:"479",
+I0925 07:03:30.809675      14 nginx.go:319] "Starting NGINX process"
+I0925 07:03:30.809769      14 leaderelection.go:258] "Attempting to acquire leader lease..." lock="ingress-nginx/ingress-nginx-leader"
+I0925 07:03:30.810200      14 nginx.go:339] "Starting validation webhook" address=":8443" certPath="/usr/local/certificates/cert" keyPath="/usr/local/certificates/key"
+I0925 07:03:30.810711      14 controller.go:217] "Configuration changes detected, backend reload required"
+I0925 07:03:30.816516      14 leaderelection.go:272] "Successfully acquired lease" lock="ingress-nginx/ingress-nginx-leader"
+I0925 07:03:30.816554      14 status.go:85] "New leader elected" identity="ingress-nginx-controller-596f5b6bcf-lxj8m"
+I0925 07:03:30.846007      14 controller.go:231] "Backend successfully reloaded"
+I0925 07:03:30.846104      14 controller.go:243] "Initial sync, sleeping for 1 second"
+cut: write error: Broken pipe
+grep: write error: Broken pipe
+-- pod churn during the run (kubectl get pods -w, last 40 lines)
+backend-6966945c84-qs4wv   0/1     Completed         0          40s
+backend-6966945c84-qs4wv   0/1     Completed         0          41s
+backend-6966945c84-qs4wv   0/1     Completed         0          41s
+backend-6966945c84-qs4wv   0/1     Completed         0          41s
+backend-6966945c84-tzjcl   0/1     Completed         0          52s
+backend-6966945c84-9546x   0/1     Pending           0          0s
+backend-6966945c84-9546x   0/1     Pending           0          1s
+backend-6966945c84-9546x   0/1     Init:0/1          0          1s
+backend-6966945c84-tzjcl   0/1     Completed         0          53s
+backend-6966945c84-tzjcl   0/1     Completed         0          53s
+backend-6966945c84-tzjcl   0/1     Completed         0          53s
+backend-6966945c84-9546x   0/1     Init:0/1          0          1s
+backend-6966945c84-9546x   0/1     Init:0/1          0          1s
+backend-6966945c84-9546x   0/1     PodInitializing   0          4s
+backend-6966945c84-9546x   0/1     Running           0          4s
+backend-6966945c84-9546x   0/1     Running           0          5s
+backend-6966945c84-9546x   0/1     Running           0          7s
+backend-6966945c84-9546x   1/1     Running           0          7s
+backend-868c485ccb-bxgfl   1/1     Terminating       0          24s
+backend-868c485ccb-bxgfl   1/1     Terminating       0          24s
+backend-6966945c84-6pkcm   0/1     Pending           0          0s
+backend-6966945c84-6pkcm   0/1     Pending           0          0s
+backend-6966945c84-6pkcm   0/1     Init:0/1          0          0s
+backend-6966945c84-6pkcm   0/1     Init:0/1          0          0s
+backend-6966945c84-6pkcm   0/1     Init:0/1          0          0s
+backend-6966945c84-6pkcm   0/1     PodInitializing   0          3s
+backend-6966945c84-6pkcm   0/1     Running           0          3s
+backend-6966945c84-6pkcm   0/1     Running           0          4s
+backend-6966945c84-6pkcm   0/1     Running           0          6s
+backend-6966945c84-6pkcm   1/1     Running           0          6s
+backend-868c485ccb-vz4zr   1/1     Terminating       0          36s
+backend-868c485ccb-vz4zr   1/1     Terminating       0          36s
+backend-868c485ccb-bxgfl   0/1     Completed         0          35s
+backend-868c485ccb-bxgfl   0/1     Completed         0          35s
+backend-868c485ccb-bxgfl   0/1     Completed         0          35s
+backend-868c485ccb-bxgfl   0/1     Completed         0          35s
+backend-868c485ccb-vz4zr   0/1     Completed         0          47s
+backend-868c485ccb-vz4zr   0/1     Completed         0          48s
+backend-868c485ccb-vz4zr   0/1     Completed         0          48s
+backend-868c485ccb-vz4zr   0/1     Completed         0          48s
+$ k get pods -l app=backend -o wide
+NAME                       READY   STATUS    RESTARTS   AGE     IP            NODE                       NOMINATED NODE   READINESS GATES
+backend-6966945c84-6pkcm   1/1     Running   0          3m13s   10.244.0.23   civicpulse-control-plane   <none>           <none>
+backend-6966945c84-9546x   1/1     Running   0          3m20s   10.244.0.22   civicpulse-control-plane   <none>           <none>
+
+=== summary
+PASS=5 FAIL=0
