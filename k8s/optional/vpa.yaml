@@ -1,0 +1,13 @@
+# Optional: needs the VPA CRDs/controller installed, so it is not part of any overlay.
+# Apply by hand: kubectl apply -f k8s/optional/vpa.yaml
+# Recommender mode only ("Off"): HPA on CPU and VPA in Auto mode both act on the CPU request and fight
+# (VPA raises the request -> utilisation drops -> HPA scales in -> per-pod load rises -> VPA raises again).
+# We read `kubectl describe vpa backend-vpa` and update the requests ourselves.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: backend-vpa
+  namespace: civicpulse
+spec:
+  targetRef: { apiVersion: apps/v1, kind: Deployment, name: backend }
+  updatePolicy: { updateMode: "Off" }

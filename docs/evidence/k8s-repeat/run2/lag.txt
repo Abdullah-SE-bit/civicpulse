@@ -1,0 +1,7 @@
+offered load: configured target 120 req/s, measured per-second peak 121 req/s; half the target first reached at epoch 1790315918
+HPA desiredReplicas > 2: 33 s after load arrived
+Deployment spec.replicas > 2 (scale actually applied): 33 s after load arrived
+HPA currentReplicas > 2: 48 s after load arrived
+Deployment readyReplicas > 2: 41 s after load arrived
+max replicas observed: 9
+sampling interval 2 s, so each figure has roughly +/- 2 s resolution

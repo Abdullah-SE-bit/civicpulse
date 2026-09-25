@@ -1,0 +1,28 @@
+name: evidence
+
+# Not part of the product pipeline. Runs the environment-level checks that need a Docker host and uploads the raw
+# transcript. Triggered only by pushing an evidence/** branch (or manually once this file is on the default branch).
+on:
+  push:
+    branches: ["evidence/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the Compose evidence script
+        run: |
+          chmod +x scripts/evidence_compose.sh
+          set -o pipefail
+          scripts/evidence_compose.sh 2>&1 | tee compose-transcript.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compose-transcript
+          path: compose-transcript.txt
