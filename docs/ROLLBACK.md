@@ -69,9 +69,9 @@ IMAGE_TAG=<good-sha> docker compose -f compose.prod.yaml up -d
 | Need a reviewable record of what changed and why | 2a |
 | Cluster and git must agree afterwards | 2 |
 
-## Evidence still to collect (not yet done)
+## Evidence
 
-Nothing below has been run; record real output in `docs/evidence/` when it has.
-- [ ] Deploy a deliberately bad image, run `rollout undo`, capture `rollout status` and `get pods`.
-- [ ] Re-apply the overlay with the previous SHA, capture `get deploy -o wide` showing the SHA.
-- [ ] Zero-downtime check: run the load generator during `kubectl set image`, capture 0 failed requests.
+Run on kind in a runner: see [evidence/rollout-run.md](evidence/rollout-run.md).
+- [x] `kubectl rollout undo` restores the previous image (exercised with a re-tagged copy of the same image, not a deliberately bad one).
+- [x] Re-apply the overlay with a previous tag (`dev-v2` then `dev`). Done with tags, **not** commit SHAs.
+- [ ] Zero-downtime check: k6 during `kubectl set image`, undo and re-apply. **Mixed**: 0 failed requests in five runs, 30 of 7,501 in one run whose cause is unknown, so zero downtime is not established.

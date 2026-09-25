@@ -63,7 +63,7 @@ The script then applied only the CPU target (`kubectl set resources deploy/backe
 - The apparent improvement (9 pods instead of 10, lower latency) is within what run-to-run variation on a shared runner could explain; one repetition per configuration is not enough to claim a performance gain.
 
 ## What was not done
-- No `kubectl set image` rolling update under load (the zero-failed-requests bonus demo).
+- The `kubectl set image` rolling update under load was tested separately: see `rollout-run.md` (mixed result).
 - No SIGTERM test on Kubernetes (Compose only, see `compose-run.md`), and no NetworkPolicy exists.
 - The load generator shared the machine with the cluster; no repetition beyond the two runs above.
 - `release.yml` has not run. (`cd.yml` later ran on `main`: see `cd-run.md`.)
