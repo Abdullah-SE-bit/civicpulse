@@ -1,0 +1,83 @@
+name: evidence-k8s
+
+# Not part of the product pipeline: brings up kind on a runner, applies the dev overlay and runs scripts/evidence_k8s.sh.
+# Triggered only by pushing an evidence/** branch.
+on:
+  push:
+    branches: ["evidence/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  kind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HIGH_RPS: "120"
+      HOLD: "240s"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.33.0
+          cluster_name: civicpulse
+          config: scripts/kind-config.yaml
+
+      - name: Install ingress-nginx and metrics-server
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/kind/deploy.yaml
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml
+          # kind's kubelets serve self-signed certificates
+          kubectl -n kube-system patch deployment metrics-server --type=json \
+            -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=240s
+          kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
+
+      - name: Install the Vertical Pod Autoscaler (recommender mode is applied later)
+        continue-on-error: true
+        run: |
+          git clone --depth 1 --branch vertical-pod-autoscaler-1.8.0 https://github.com/kubernetes/autoscaler.git /tmp/autoscaler
+          cd /tmp/autoscaler/vertical-pod-autoscaler
+          ./hack/vpa-up.sh
+          kubectl -n kube-system get pods | grep vpa
+
+      - name: Build the images and load them into kind
+        run: |
+          docker build -t ghcr.io/abdullah-se-bit/civicpulse-backend:dev backend
+          docker build -t ghcr.io/abdullah-se-bit/civicpulse-frontend:dev frontend
+          kind load docker-image ghcr.io/abdullah-se-bit/civicpulse-backend:dev ghcr.io/abdullah-se-bit/civicpulse-frontend:dev --name civicpulse
+
+      - name: Apply the dev overlay (placeholder Secret is fine for this throwaway cluster)
+        run: |
+          kubectl create namespace civicpulse
+          kubectl apply -f k8s/secret.example.yaml
+          kubectl apply -k k8s/overlays/dev
+          kubectl -n civicpulse rollout status statefulset/postgres --timeout=240s
+          kubectl -n civicpulse rollout status deployment/redis --timeout=120s
+          kubectl -n civicpulse rollout status deployment/backend --timeout=300s
+          kubectl -n civicpulse rollout status deployment/frontend --timeout=120s
+
+      - uses: grafana/setup-k6-action@v1
+      - run: pip install matplotlib
+
+      - name: Run the evidence script
+        run: |
+          chmod +x scripts/evidence_k8s.sh
+          mkdir -p out
+          set -o pipefail
+          scripts/evidence_k8s.sh 2>&1 | tee out/k8s-transcript.txt
+
+      - if: always()
+        name: Cluster state on failure
+        run: |
+          kubectl get pods -A -o wide || true
+          kubectl -n civicpulse describe pods | tail -80 || true
+          kubectl -n civicpulse logs deploy/backend --all-containers --tail=60 || true
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k8s-evidence
+          path: out/

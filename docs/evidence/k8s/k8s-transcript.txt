@@ -1,0 +1,511 @@
+=== environment
+$ kubectl version
+Client Version: v1.35.0
+Kustomize Version: v5.7.1
+Server Version: v1.37.0
+Warning: version difference between client (1.35) and server (1.37) exceeds the supported minor version skew of +/-1
+$ kubectl get nodes -o wide
+NAME                       STATUS   ROLES           AGE    VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION              CONTAINER-RUNTIME
+civicpulse-control-plane   Ready    control-plane   2m6s   v1.37.0   172.18.0.2    <none>        Debian GNU/Linux 13 (trixie)   6.17.0-1022-azure (amd64)   containerd://2.3.4
+$ kind version
+kind v0.33.0 go1.26.7 linux/amd64
+=== 1. what is deployed
+NAMESPACE            NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+civicpulse           backend                    2/2     2            2           41s
+civicpulse           frontend                   2/2     2            2           41s
+civicpulse           redis                      1/1     1            1           41s
+ingress-nginx        ingress-nginx-controller   1/1     1            1           103s
+kube-system          metrics-server             1/1     1            1           103s
+$ k get all,ingress,cm,pvc,hpa,pdb -o wide
+NAME                            READY   STATUS    RESTARTS   AGE   IP            NODE                       NOMINATED NODE   READINESS GATES
+pod/backend-6966945c84-lkhdd    1/1     Running   0          41s   10.244.0.13   civicpulse-control-plane   <none>           <none>
+pod/backend-6966945c84-scjvh    1/1     Running   0          41s   10.244.0.16   civicpulse-control-plane   <none>           <none>
+pod/frontend-77c4fd4667-rrzgs   1/1     Running   0          41s   10.244.0.15   civicpulse-control-plane   <none>           <none>
+pod/frontend-77c4fd4667-vxflz   1/1     Running   0          41s   10.244.0.14   civicpulse-control-plane   <none>           <none>
+pod/postgres-0                  1/1     Running   0          40s   10.244.0.20   civicpulse-control-plane   <none>           <none>
+pod/redis-6bc9bc6bb8-fxcxr      1/1     Running   0          40s   10.244.0.19   civicpulse-control-plane   <none>           <none>
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/backend    ClusterIP   10.96.194.148   <none>        8000/TCP   41s   app=backend
+service/frontend   ClusterIP   10.96.198.32    <none>        80/TCP     41s   app=frontend
+service/postgres   ClusterIP   10.96.122.168   <none>        5432/TCP   41s   app=postgres
+service/redis      ClusterIP   10.96.29.48     <none>        6379/TCP   41s   app=redis
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                            SELECTOR
+deployment.apps/backend    2/2     2            2           41s   backend      ghcr.io/abdullah-se-bit/civicpulse-backend:dev    app=backend
+deployment.apps/frontend   2/2     2            2           41s   frontend     ghcr.io/abdullah-se-bit/civicpulse-frontend:dev   app=frontend
+deployment.apps/redis      1/1     1            1           41s   redis        redis:7.4.1-alpine                                app=redis
+NAME                                  DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                                            SELECTOR
+replicaset.apps/backend-6966945c84    2         2         2       41s   backend      ghcr.io/abdullah-se-bit/civicpulse-backend:dev    app=backend,pod-template-hash=6966945c84
+replicaset.apps/frontend-77c4fd4667   2         2         2       41s   frontend     ghcr.io/abdullah-se-bit/civicpulse-frontend:dev   app=frontend,pod-template-hash=77c4fd4667
+replicaset.apps/redis-6bc9bc6bb8      1         1         1       41s   redis        redis:7.4.1-alpine                                app=redis,pod-template-hash=6bc9bc6bb8
+NAME                        READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/postgres   1/1     40s   postgres     postgres:16.6-alpine
+NAME                                          REFERENCE            TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/backend   Deployment/backend   cpu: <unknown>/60%   2         10        2          40s
+NAME                                   CLASS   HOSTS                     ADDRESS     PORTS   AGE
+ingress.networking.k8s.io/civicpulse   nginx   civicpulse.localtest.me   localhost   80      40s
+NAME                          DATA   AGE
+configmap/civicpulse-config   9      41s
+configmap/kube-root-ca.crt    1      41s
+NAME                                      STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE   VOLUMEMODE
+persistentvolumeclaim/pgdata-postgres-0   Bound    pvc-3958eeeb-8401-4f5a-ae74-c929c9c6ce6c   1Gi        RWO            standard       <unset>                 40s   Filesystem
+persistentvolumeclaim/redis-data          Bound    pvc-9767fbfd-2eec-4b2b-ad5e-02aadd20e07b   256Mi      RWO            standard       <unset>                 41s   Filesystem
+NAME                                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+poddisruptionbudget.policy/backend   1               N/A               1                     40s
+-- secrets (names only, never values)
+$ k get secret
+NAME                 TYPE     DATA   AGE
+civicpulse-secrets   Opaque   3      41s
+-- replicas per workload
+$ k get deploy,statefulset -o custom-columns=NAME:.metadata.name,DESIRED:.spec.replicas,READY:.status.readyReplicas
+NAME       DESIRED   READY
+backend    2         2
+frontend   2         2
+redis      1         1
+postgres   1         1
+-- backend probes, rollout strategy and resources (from the live object)
+{"startupProbe":{"failureThreshold":30,"httpGet":{"path":"/health","port":8000,"scheme":"HTTP"},"periodSeconds":2,"successThreshold":1,"timeoutSeconds":1},"livenessProbe":{"failureThreshold":3,"httpGet":{"path":"/health","port":8000,"scheme":"HTTP"},"periodSeconds":10,"successThreshold":1,"timeoutSeconds":1},"readinessProbe":{"failureThreshold":3,"httpGet":{"path":"/ready","port":8000,"scheme":"HTTP"},"periodSeconds":5,"successThreshold":1,"timeoutSeconds":1},"resources":{"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}}
+{"strategy":{"rollingUpdate":{"maxSurge":1,"maxUnavailable":0},"type":"RollingUpdate"},"terminationGracePeriodSeconds":30,"preStop":{"preStop":{"exec":{"command":["sleep","10"]}}}}
+-- service types
+$ k get svc -o custom-columns=NAME:.metadata.name,TYPE:.spec.type,PORT:.spec.ports[0].port
+NAME       TYPE        PORT
+backend    ClusterIP   8000
+frontend   ClusterIP   80
+postgres   ClusterIP   5432
+redis      ClusterIP   6379
+PASS  all four services are ClusterIP
+PASS  postgres is a StatefulSet
+PASS  postgres has a bound PVC
+PASS  redis has a bound PVC
+PASS  every container sets cpu+memory requests and limits
+PASS  backend and frontend have >= 2 ready replicas
+=== 2. metrics-server and kubectl top
+$ kubectl top nodes
+NAME                       CPU(cores)   CPU(%)   MEMORY(bytes)   MEMORY(%)   
+civicpulse-control-plane   932m         23%      1219Mi          7%          
+$ kubectl top pods -n civicpulse
+NAME                        CPU(cores)   MEMORY(bytes)   
+backend-6966945c84-lkhdd    147m         67Mi            
+backend-6966945c84-scjvh    140m         67Mi            
+frontend-77c4fd4667-rrzgs   1m           4Mi             
+frontend-77c4fd4667-vxflz   0m           4Mi             
+postgres-0                  92m          24Mi            
+redis-6bc9bc6bb8-fxcxr      7m           8Mi             
+PASS  kubectl top pods works
+$ k get hpa backend
+NAME      REFERENCE            TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+backend   Deployment/backend   cpu: <unknown>/60%   2         10        2          41s
+=== 3. behaviour through the Ingress (single host)
+PASS  frontend served on /
+{"id":"cf21c6bd-91c8-4d87-81d3-a8a5589f9fe3","category":"sanitation","priority":"normal","status":"open","triaged_by":"simulated"}
+PASS  POST /api/complaints -> 201 shape
+PASS  GET /api/complaints/{id}
+-- stats cache
+HTTP/1.1 200 OK
+x-cache: MISS
+HTTP/1.1 200 OK
+x-cache: HIT
+open -> in_progress: HTTP 200
+PASS  valid transition 200
+in_progress -> open: HTTP 409
+{"detail":"Invalid status transition: in_progress -> open"}
+PASS  invalid transition 409
+-- probes from inside the cluster (port-forward to one backend pod)
+$ curl -sS -i http://127.0.0.1:18000/health
+HTTP/1.1 200 OK
+date: Thu, 24 Sep 2026 20:42:21 GMT
+server: uvicorn
+content-length: 15
+content-type: application/json
+x-request-id: 98a63057-ac67-4a76-a167-3d62a467b3dd
+{"status":"ok"}$ curl -sS -i http://127.0.0.1:18000/ready
+HTTP/1.1 200 OK
+date: Thu, 24 Sep 2026 20:42:21 GMT
+server: uvicorn
+content-length: 18
+content-type: application/json
+x-request-id: beaa204c-d015-4bf0-a277-d9355cf3c681
+{"status":"ready"}PASS  /health 200
+PASS  /ready 200 (postgres + redis reachable from the pod)
+-- init container that ran migrations + seed
+$ k logs backend-6966945c84-lkhdd -c migrate
+seeded 0 new complaints
+=== 4. postgres pod deleted: rows must survive
+rows before: 33
+$ k delete pod postgres-0
+pod "postgres-0" deleted from civicpulse namespace
+$ k wait --for=condition=ready pod/postgres-0 --timeout=180s
+pod/postgres-0 condition met
+rows after: 33
+PASS  row count preserved across postgres pod deletion
+PASS  the created complaint still exists
+=== 5. redis down: readiness and liveness are different decisions
+$ k scale deploy/redis --replicas=0
+deployment.apps/redis scaled
+$ curl -sS -i http://127.0.0.1:18000/ready
+HTTP/1.1 503 Service Unavailable
+date: Thu, 24 Sep 2026 20:42:52 GMT
+server: uvicorn
+content-length: 41
+content-type: application/json
+x-request-id: df5ce0ba-f105-401d-be35-bb236d66d503
+{"status":"unavailable","failed":"redis"}PASS  /ready is 503 naming redis
+PASS  /health still 200 (liveness independent)
+-- backend endpoints (pods failing readiness leave the Service)
+$ k get endpoints backend
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME      ENDPOINTS   AGE
+backend               75s
+$ k get pods -l app=backend
+NAME                       READY   STATUS    RESTARTS   AGE
+backend-6966945c84-lkhdd   0/1     Running   0          75s
+backend-6966945c84-scjvh   0/1     Running   0          75s
+-- restarts stay 0 (liveness did not kill them)
+NAME                       RESTARTS
+backend-6966945c84-lkhdd   0
+backend-6966945c84-scjvh   0
+PASS  no backend restarts caused by redis being down
+$ k scale deploy/redis --replicas=1
+deployment.apps/redis scaled
+$ k rollout status deploy/redis --timeout=120s
+Waiting for deployment "redis" rollout to finish: 0 of 1 updated replicas are available...
+deployment "redis" successfully rolled out
+PASS  ready again after redis returns
+=== 6. HPA under load, run 1 (initial requests; k6 open model; cluster + k6 share one runner)
+runner: 4 vCPU, 15989 MB RAM
+$ k get hpa backend -o yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"autoscaling/v2","kind":"HorizontalPodAutoscaler","metadata":{"annotations":{},"name":"backend","namespace":"civicpulse"},"spec":{"behavior":{"scaleDown":{"stabilizationWindowSeconds":300},"scaleUp":{"stabilizationWindowSeconds":0}},"maxReplicas":10,"metrics":[{"resource":{"name":"cpu","target":{"averageUtilization":60,"type":"Utilization"}},"type":"Resource"}],"minReplicas":2,"scaleTargetRef":{"apiVersion":"apps/v1","kind":"Deployment","name":"backend"}}}
+  creationTimestamp: "2026-09-24T20:41:38Z"
+  generation: 1
+  name: backend
+  namespace: civicpulse
+  resourceVersion: "1269"
+  uid: afc47fb9-cdc6-445d-87d3-9fa1d2a9662d
+spec:
+  behavior:
+    scaleDown:
+      policies:
+      - periodSeconds: 15
+        type: Percent
+        value: 100
+      selectPolicy: Max
+      stabilizationWindowSeconds: 300
+    scaleUp:
+      policies:
+      - periodSeconds: 15
+        type: Pods
+        value: 4
+      - periodSeconds: 15
+        type: Percent
+        value: 100
+      selectPolicy: Max
+      stabilizationWindowSeconds: 0
+  maxReplicas: 10
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 60
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+status:
+  conditions:
+  - lastTransitionTime: "2026-09-24T20:41:38Z"
+    message: the HPA controller was able to get the target's current scale
+    reason: SucceededGetScale
+    status: "True"
+    type: AbleToScale
+  - lastTransitionTime: "2026-09-24T20:41:38Z"
+    message: 'the HPA was unable to compute the replica count: failed to get cpu utilization:
+      did not receive metrics for targeted pods (pods might be unready)'
+    reason: FailedGetResourceMetric
+    status: "False"
+    type: ScalingActive
+  currentMetrics:
+  - type: ""
+  currentReplicas: 2
+  desiredReplicas: 0
+  observedGeneration: 1
+backend resources before: {"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}
+k6 start: 2026-09-24T20:43:06Z HIGH_RPS=120 HOLD=240s
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+     execution: local
+        script: load/k6-script.js
+        output: csv (out/run1/k6-full.csv)
+     scenarios: (100.00%) 1 scenario, 300 max VUs, 6m20s max duration (incl. graceful stop):
+              * hpa_probe: Up to 120.00 iterations/s for 5m50s over 5 stages (maxVUs: 50-300, gracefulStop: 30s)
+  █ TOTAL RESULTS 
+    checks_total.......: 30499   87.187216/s
+    checks_succeeded...: 100.00% 30499 out of 30499
+    checks_failed......: 0.00%   0 out of 30499
+    ✓ status 200
+    HTTP
+    http_req_duration..............: avg=7.68ms min=4.44ms med=6ms    max=280.3ms  p(90)=9.07ms p(95)=13.5ms 
+      { expected_response:true }...: avg=7.68ms min=4.44ms med=6ms    max=280.3ms  p(90)=9.07ms p(95)=13.5ms 
+    http_req_failed................: 0.00%  0 out of 30499
+    http_reqs......................: 30499  87.187216/s
+    EXECUTION
+    iteration_duration.............: avg=7.82ms min=4.53ms med=6.12ms max=280.53ms p(90)=9.24ms p(95)=13.67ms
+    iterations.....................: 30499  87.187216/s
+    vus............................: 0      min=0          max=11
+    vus_max........................: 50     min=50         max=50
+    NETWORK
+    data_received..................: 475 MB 1.4 MB/s
+    data_sent......................: 3.5 MB 9.9 kB/s
+k6 end:   2026-09-24T20:48:56Z
+-- kubectl get hpa -w (captured; it prints a row when a value changes)
+NAME      REFERENCE            TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+backend   Deployment/backend   cpu: <unknown>/60%   2         10        2          78s
+backend   Deployment/backend   cpu: 19%/60%         2         10        2          2m
+backend   Deployment/backend   cpu: 104%/60%        2         10        2          2m30s
+backend   Deployment/backend   cpu: 315%/60%        2         10        4          2m45s
+backend   Deployment/backend   cpu: 328%/60%        2         10        8          3m
+backend   Deployment/backend   cpu: 219%/60%        2         10        10         3m15s
+backend   Deployment/backend   cpu: 123%/60%        2         10        10         3m30s
+backend   Deployment/backend   cpu: 75%/60%         2         10        10         3m45s
+backend   Deployment/backend   cpu: 72%/60%         2         10        10         4m
+backend   Deployment/backend   cpu: 74%/60%         2         10        10         4m15s
+backend   Deployment/backend   cpu: 73%/60%         2         10        10         4m30s
+backend   Deployment/backend   cpu: 75%/60%         2         10        10         4m45s
+backend   Deployment/backend   cpu: 74%/60%         2         10        10         5m
+backend   Deployment/backend   cpu: 71%/60%         2         10        10         5m15s
+backend   Deployment/backend   cpu: 72%/60%         2         10        10         6m
+backend   Deployment/backend   cpu: 69%/60%         2         10        10         6m30s
+backend   Deployment/backend   cpu: 29%/60%         2         10        10         6m45s
+backend   Deployment/backend   cpu: 7%/60%          2         10        10         7m
+backend   Deployment/backend   cpu: 5%/60%          2         10        10         7m15s
+backend   Deployment/backend   cpu: 6%/60%          2         10        10         7m30s
+-- HPA events
+Events:
+  Type     Reason                        Age                    From                       Message
+  ----     ------                        ----                   ----                       -------
+  Warning  FailedGetResourceMetric       7m8s (x3 over 7m38s)   horizontal-pod-autoscaler  failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedComputeMetricsReplicas  7m8s (x3 over 7m38s)   horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedGetResourceMetric       5m53s (x5 over 6m53s)  horizontal-pod-autoscaler  failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Warning  FailedComputeMetricsReplicas  5m53s (x5 over 6m53s)  horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Normal   SuccessfulRescale             5m8s                   horizontal-pod-autoscaler  New size: 4; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             4m53s                  horizontal-pod-autoscaler  New size: 8; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             4m38s                  horizontal-pod-autoscaler  New size: 10; reason: cpu resource utilization (percentage of request) above target
+$ kubectl top pods -n civicpulse
+NAME                        CPU(cores)   MEMORY(bytes)   
+backend-6966945c84-4fts4    5m           67Mi            
+backend-6966945c84-5gth8    3m           67Mi            
+backend-6966945c84-6z96m    6m           67Mi            
+backend-6966945c84-l6pbb    6m           67Mi            
+backend-6966945c84-lkhdd    9m           68Mi            
+backend-6966945c84-m7w8p    5m           67Mi            
+backend-6966945c84-pdrj5    4m           67Mi            
+backend-6966945c84-rc5rv    5m           68Mi            
+backend-6966945c84-scjvh    6m           68Mi            
+backend-6966945c84-xxn9j    4m           67Mi            
+frontend-77c4fd4667-rrzgs   1m           4Mi             
+frontend-77c4fd4667-vxflz   1m           4Mi             
+postgres-0                  10m          80Mi            
+redis-6bc9bc6bb8-bjtkn      9m           8Mi             
+offered load: configured target 120 req/s, measured per-second peak 127 req/s; half the target first reached at epoch 1790282621
+HPA desiredReplicas > 2: 27 s after load arrived
+Deployment spec.replicas > 2 (scale actually applied): 27 s after load arrived
+HPA currentReplicas > 2: 42 s after load arrived
+Deployment readyReplicas > 2: 36 s after load arrived
+max replicas observed: 10
+sampling interval 2 s, so each figure has roughly +/- 2 s resolution
+PASS  run1: chart produced from measured data
+=== 7. VPA recommendation (recommender mode, updateMode Off)
+$ kubectl apply -f k8s/optional/vpa.yaml
+verticalpodautoscaler.autoscaling.k8s.io/backend-vpa created
+(waiting for the recommender)
+$ k describe vpa backend-vpa
+Name:         backend-vpa
+Namespace:    civicpulse
+Labels:       <none>
+Annotations:  <none>
+API Version:  autoscaling.k8s.io/v1
+Kind:         VerticalPodAutoscaler
+Metadata:
+  Creation Timestamp:  2026-09-24T20:49:21Z
+  Generation:          1
+  Resource Version:    2422
+  UID:                 adedbcbf-9cb0-403d-96d8-47fd12e89a3b
+Spec:
+  Target Ref:
+    API Version:  apps/v1
+    Kind:         Deployment
+    Name:         backend
+  Update Policy:
+    Update Mode:  Off
+Status:
+  Conditions:
+    Last Transition Time:  2026-09-24T20:50:07Z
+    Status:                True
+    Type:                  RecommendationProvided
+  Observed Generation:     1
+  Recommendation:
+    Container Recommendations:
+      Container Name:  backend
+      Lower Bound:
+        Cpu:     64m
+        Memory:  250Mi
+      Target:
+        Cpu:     163m
+        Memory:  250Mi
+      Uncapped Target:
+        Cpu:     163m
+        Memory:  250Mi
+      Upper Bound:
+        Cpu:     40709m
+        Memory:  18777003752
+Events:          <none>
+-- requests we guessed in k8s/base/backend.yaml:
+{"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"100m","memory":"128Mi"}}
+=== 8. apply the recommended CPU request, reset replicas, run the load again
+VPA target cpu = 163m (memory is not changed: see the write-up)
+$ k set resources deploy/backend -c backend --requests=cpu=163m
+deployment.apps/backend resource requirements updated
+$ k scale deploy/backend --replicas=2
+deployment.apps/backend scaled
+$ k rollout status deploy/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 0 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+backend resources now: {"limits":{"cpu":"500m","memory":"384Mi"},"requests":{"cpu":"163m","memory":"128Mi"}}
+k6 start: 2026-09-24T20:51:32Z HIGH_RPS=120 HOLD=240s
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+     execution: local
+        script: load/k6-script.js
+        output: csv (out/run2/k6-full.csv)
+     scenarios: (100.00%) 1 scenario, 300 max VUs, 6m20s max duration (incl. graceful stop):
+              * hpa_probe: Up to 120.00 iterations/s for 5m50s over 5 stages (maxVUs: 50-300, gracefulStop: 30s)
+  █ TOTAL RESULTS 
+    checks_total.......: 30499   87.187268/s
+    checks_succeeded...: 100.00% 30499 out of 30499
+    checks_failed......: 0.00%   0 out of 30499
+    ✓ status 200
+    HTTP
+    http_req_duration..............: avg=7.32ms min=4.36ms med=6.17ms max=239.18ms p(90)=9.02ms p(95)=11.66ms
+      { expected_response:true }...: avg=7.32ms min=4.36ms med=6.17ms max=239.18ms p(90)=9.02ms p(95)=11.66ms
+    http_req_failed................: 0.00%  0 out of 30499
+    http_reqs......................: 30499  87.187268/s
+    EXECUTION
+    iteration_duration.............: avg=7.46ms min=4.45ms med=6.31ms max=239.42ms p(90)=9.23ms p(95)=11.85ms
+    iterations.....................: 30499  87.187268/s
+    vus............................: 0      min=0          max=8 
+    vus_max........................: 50     min=50         max=50
+    NETWORK
+    data_received..................: 475 MB 1.4 MB/s
+    data_sent......................: 3.5 MB 9.9 kB/s
+k6 end:   2026-09-24T20:57:22Z
+-- kubectl get hpa -w (captured; it prints a row when a value changes)
+NAME      REFERENCE            TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+backend   Deployment/backend   cpu: <unknown>/60%   2         10        2          9m44s
+backend   Deployment/backend   cpu: 1%/60%          2         10        2          9m45s
+backend   Deployment/backend   cpu: 3%/60%          2         10        2          10m
+backend   Deployment/backend   cpu: 11%/60%         2         10        2          10m
+backend   Deployment/backend   cpu: 14%/60%         2         10        2          10m
+backend   Deployment/backend   cpu: 107%/60%        2         10        2          11m
+backend   Deployment/backend   cpu: 193%/60%        2         10        4          11m
+backend   Deployment/backend   cpu: 206%/60%        2         10        7          11m
+backend   Deployment/backend   cpu: 132%/60%        2         10        7          11m
+backend   Deployment/backend   cpu: 80%/60%         2         10        7          12m
+backend   Deployment/backend   cpu: 61%/60%         2         10        9          12m
+backend   Deployment/backend   cpu: 65%/60%         2         10        9          12m
+backend   Deployment/backend   cpu: 53%/60%         2         10        9          12m
+backend   Deployment/backend   cpu: 50%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 52%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          13m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 51%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 50%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 50%/60%         2         10        9          14m
+backend   Deployment/backend   cpu: 45%/60%         2         10        9          15m
+backend   Deployment/backend   cpu: 18%/60%         2         10        9          15m
+backend   Deployment/backend   cpu: 4%/60%          2         10        9          15m
+backend   Deployment/backend   cpu: 4%/60%          2         10        9          15m
+backend   Deployment/backend   cpu: 4%/60%          2         10        9          16m
+-- HPA events
+Events:
+  Type     Reason                        Age                  From                       Message
+  ----     ------                        ----                 ----                       -------
+  Warning  FailedGetResourceMetric       15m (x3 over 16m)    horizontal-pod-autoscaler  failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedComputeMetricsReplicas  15m (x3 over 16m)    horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Normal   SuccessfulRescale             13m                  horizontal-pod-autoscaler  New size: 8; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             13m                  horizontal-pod-autoscaler  New size: 10; reason: cpu resource utilization (percentage of request) above target
+  Warning  FailedGetResourceMetric       6m34s (x8 over 15m)  horizontal-pod-autoscaler  failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Warning  FailedComputeMetricsReplicas  6m34s (x8 over 15m)  horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Normal   SuccessfulRescale             5m4s (x2 over 13m)   horizontal-pod-autoscaler  New size: 4; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             4m49s                horizontal-pod-autoscaler  New size: 7; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             4m4s                 horizontal-pod-autoscaler  New size: 9; reason: cpu resource utilization (percentage of request) above target
+$ kubectl top pods -n civicpulse
+NAME                        CPU(cores)   MEMORY(bytes)   
+backend-6746bf8bb6-2ht5v    5m           67Mi            
+backend-6746bf8bb6-47tzm    4m           67Mi            
+backend-6746bf8bb6-8rf29    4m           67Mi            
+backend-6746bf8bb6-9lgcp    4m           67Mi            
+backend-6746bf8bb6-bqt75    7m           67Mi            
+backend-6746bf8bb6-ng58m    3m           67Mi            
+backend-6746bf8bb6-s9rlm    4m           67Mi            
+backend-6746bf8bb6-t7v2s    5m           68Mi            
+backend-6746bf8bb6-w8nf7    5m           67Mi            
+frontend-77c4fd4667-rrzgs   1m           4Mi             
+frontend-77c4fd4667-vxflz   1m           4Mi             
+postgres-0                  7m           69Mi            
+redis-6bc9bc6bb8-bjtkn      8m           8Mi             
+offered load: configured target 120 req/s, measured per-second peak 124 req/s; half the target first reached at epoch 1790283127
+HPA desiredReplicas > 2: 33 s after load arrived
+Deployment spec.replicas > 2 (scale actually applied): 33 s after load arrived
+HPA currentReplicas > 2: 48 s after load arrived
+Deployment readyReplicas > 2: 42 s after load arrived
+max replicas observed: 9
+sampling interval 2 s, so each figure has roughly +/- 2 s resolution
+PASS  run2: chart produced from measured data
+-- lag numbers, run 1 vs run 2
+[run1]
+offered load: configured target 120 req/s, measured per-second peak 127 req/s; half the target first reached at epoch 1790282621
+HPA desiredReplicas > 2: 27 s after load arrived
+Deployment spec.replicas > 2 (scale actually applied): 27 s after load arrived
+HPA currentReplicas > 2: 42 s after load arrived
+Deployment readyReplicas > 2: 36 s after load arrived
+max replicas observed: 10
+sampling interval 2 s, so each figure has roughly +/- 2 s resolution
+[run2]
+offered load: configured target 120 req/s, measured per-second peak 124 req/s; half the target first reached at epoch 1790283127
+HPA desiredReplicas > 2: 33 s after load arrived
+Deployment spec.replicas > 2 (scale actually applied): 33 s after load arrived
+HPA currentReplicas > 2: 48 s after load arrived
+Deployment readyReplicas > 2: 42 s after load arrived
+max replicas observed: 9
+sampling interval 2 s, so each figure has roughly +/- 2 s resolution
+=== summary
+PASS=22 FAIL=0
