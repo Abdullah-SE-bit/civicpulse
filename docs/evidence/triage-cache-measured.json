@@ -1,0 +1,36 @@
+{
+  "conditions": {
+    "provider": "simulated",
+    "simulated_inference_ms": 300,
+    "requests": 38,
+    "distinct_incidents": 12,
+    "reports_per_incident": [
+      9,
+      6,
+      5,
+      4,
+      3,
+      3,
+      2,
+      2,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "app_counters_this_run": {
+    "hits": 26,
+    "misses": 12,
+    "hit_rate": 0.684
+  },
+  "redis_triage_keys": 12,
+  "inferences_avoided": 26,
+  "client_latency_ms": {
+    "miss_median": 341.5,
+    "hit_median": 51.1,
+    "miss_n": 12,
+    "hit_n": 26
+  },
+  "consistent": true
+}
