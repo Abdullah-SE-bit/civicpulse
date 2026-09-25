@@ -1,0 +1,44 @@
+name: evidence-quickstart
+
+# Runs the README quickstart literally from a fresh clone of the public repository, in an empty directory.
+# Only pushes to evidence-quickstart/**.
+on:
+  push:
+    branches: ["evidence-quickstart/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  quickstart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # Deliberately NO actions/checkout: the point is a clone with nothing else on disk.
+      - name: README quickstart, exactly as written (plus -d so the step can continue)
+        run: |
+          set -x
+          mkdir /tmp/fresh && cd /tmp/fresh
+          git clone https://github.com/Abdullah-SE-bit/civicpulse.git && cd civicpulse
+          git log --oneline -1
+          cp .env.example .env
+          docker compose up --build -d
+          docker compose ps
+
+      - name: Check what the README promises
+        working-directory: /tmp/fresh/civicpulse
+        run: |
+          for i in $(seq 1 60); do curl -fsS http://localhost:8000/ready >/dev/null 2>&1 && break; sleep 2; done
+          echo "--- UI on :8080"; curl -sS -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:8080/; curl -sS http://localhost:8080/ | grep -o '<title>[^<]*</title>'
+          echo "--- API docs on :8000/docs"; curl -sS -o /dev/null -w 'HTTP %{http_code}\n' http://localhost:8000/docs
+          echo "--- seeded data (README says 30+, idempotent)"; curl -sS 'http://localhost:8080/api/complaints?page=1&page_size=1' | python3 -c 'import sys,json; d=json.load(sys.stdin); print("total rows:", d["total"])'
+          echo "--- seed is idempotent: restart the backend and count again"
+          docker compose restart backend >/dev/null 2>&1
+          for i in $(seq 1 60); do curl -fsS http://localhost:8000/ready >/dev/null 2>&1 && break; sleep 2; done
+          curl -sS 'http://localhost:8080/api/complaints?page=1&page_size=1' | python3 -c 'import sys,json; d=json.load(sys.stdin); print("total rows after restart:", d["total"])'
+          echo "--- one submission through the UI's proxy path"
+          curl -sS -X POST http://localhost:8080/api/complaints -H 'Content-Type: application/json' -d '{"text":"Burst water main flooding Street 12","location":"Street 12"}' | python3 -c 'import sys,json; d=json.load(sys.stdin); print({k:d[k] for k in ("category","priority","status","triaged_by")})'
+
+      - if: always()
+        working-directory: /tmp/fresh/civicpulse
+        run: docker compose logs --no-color --tail=40 backend || true
