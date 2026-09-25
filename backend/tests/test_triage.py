@@ -142,6 +142,17 @@ def test_duplicate_complaints_cost_one_inference():
     assert second.result == first.result and second.triaged_by == "simulated"
 
 
+def test_cache_is_scoped_to_the_provider():
+    cache = DictCache()
+    a, b = SimulatedTriage(), RuleBasedTriage()
+    first, _ = make_service(a, cache)
+    second, _ = make_service(b, cache)
+    assert first.triage(TEXT, LOC).triaged_by == "simulated"
+    out = second.triage(TEXT, LOC)  # same text, different provider: must not reuse the simulated result
+    assert out.triaged_by == "rules" and not out.cache_hit
+    assert len(cache.data) == 2
+
+
 def test_fallback_results_are_not_cached():
     p = SimulatedTriage("raise")
     cache = DictCache()
