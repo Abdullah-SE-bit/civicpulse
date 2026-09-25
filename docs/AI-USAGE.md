@@ -28,6 +28,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | 2026-09-25 | Claude Code / ALPHA | Backend data layer | Domain enums and state machine, models, Alembic migration, repository, ComplaintService, idempotent seed, backend Dockerfile and entrypoint, tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend HTTP API | FastAPI app, routes, Redis stats cache + rate limiter + triage cache, health/ready/metrics, JSON logging, API tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend audit fixes and docs | Factory/env handling fixes, k8s backend init-container change, extra Redis/config tests, TRIAGE.md, ADR 0001 (provider interface) and 0004 (PII), engineering notes 4 and 8 and index justifications. Also renamed the frontend ADR to 0002 to match the required ADR set. | _pending review by BETA_ |
+| 2026-09-25 | Claude Code / ALPHA | Compose evidence on a laptop, script portability | Ran the evidence script on real Docker, found and fixed the rate-limit and cache-key defects (#46, #50), patched the script for Windows and per-run text, wrote the laptop evidence note | _pending review by BETA_ |
 
 
 
