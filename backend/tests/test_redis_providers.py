@@ -54,4 +54,4 @@ def test_limiter_counts_per_client_and_window():
 
 def test_settings_treat_empty_env_as_unset():
     s = Settings.from_env({"DATABASE_URL": "", "REDIS_URL": "", "RATE_LIMIT_PER_MINUTE": ""})
-    assert s.redis_url.startswith("redis://localhost") and s.rate_limit_per_minute == 20
+    assert s.redis_url == "redis://redis:6379/0" and "@postgres:5432/" in s.database_url and s.rate_limit_per_minute == 20
