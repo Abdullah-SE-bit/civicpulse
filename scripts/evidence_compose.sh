@@ -3,7 +3,9 @@
 # Needs docker compose, curl, jq. Exit code is non-zero if any check FAILs. Run from the repo root.
 set -uo pipefail
 
+export COMPOSE_PATH_SEPARATOR=:  # the default separator is ';' on Windows, which would make every compose call fail
 export COMPOSE_FILE=compose.yaml:scripts/evidence.override.yaml
+RUN_ID=$(date +%s)$RANDOM  # unique per run: a rerun on a dirty Redis volume must not hit the 24 h triage cache
 FRONT=http://localhost:8080
 BACK=http://localhost:8000
 PASS=0; FAIL=0
@@ -16,7 +18,7 @@ check() { # check "name" <command...> ; PASS when the command exits 0
 }
 wait_ready() { for _ in $(seq 1 60); do curl -fsS "$BACK/ready" >/dev/null 2>&1 && return 0; sleep 2; done; return 1; }
 post() { curl -sS -o /tmp/post.json -w '%{http_code}' -X POST "$BACK/api/complaints" -H 'Content-Type: application/json' \
-  -H "X-Forwarded-For: ${2:-198.51.100.1}" -d "{\"text\":\"$1\",\"location\":\"Street 12\"}"; }
+  -H "X-Forwarded-For: ${2:-198.51.100.1}" -d "{\"text\":\"$1 (run $RUN_ID)\",\"location\":\"Street 12\"}"; }
 
 say "environment"
 run uname -a; run docker --version; run docker compose version
@@ -96,7 +98,8 @@ for i in $(seq 1 30); do
   [ "$c" = 201 ] && sp_ok=$((sp_ok+1)); [ "$c" = 429 ] && sp_lim=$((sp_lim+1))
 done
 echo "30 POSTs via the proxy with rotating spoofed first hops: $sp_ok x 201, $sp_lim x 429"
-echo "limiter keys in redis:"; docker compose exec -T redis redis-cli --scan --pattern 'rl:*' | tr -d '' | sort | head -5
+echo "limiter keys in redis:"; docker compose exec -T redis redis-cli --scan --pattern 'rl:*' | tr -d '
+' | sort | head -5
 check "spoofed first hops do not evade the limit" test "$sp_lim" -gt 0
 check "spoofed hops share one limiter key" bash -c "[ \"$(docker compose exec -T redis redis-cli --scan --pattern 'rl:*' | wc -l)\" -le 2 ]"
 

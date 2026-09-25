@@ -1,0 +1,346 @@
+
+=== environment
+$ uname -a
+MINGW64_NT-10.0-26200 <laptop-hostname> 3.6.9-b4195d69.x86_64 2026-06-06 17:49 UTC x86_64 Msys
+$ docker --version
+Docker version 29.8.0, build 88096ef
+$ docker compose version
+Docker Compose version v5.5.1
+
+=== 1. compose config validates
+PASS  docker compose config
+$ docker compose config --services
+postgres
+redis
+backend
+frontend
+
+=== 2. images build; build context and image facts
+#10 transferring context: 129B 0.0s done
+#11 transferring context: 23.34kB 0.1s done
+#23 transferring context: 116B 0.0s done
+#24 transferring context: 835B 0.0s done
+#36 naming to docker.io/library/civicpulse-frontend:latest done
+#38 naming to docker.io/library/civicpulse-backend:latest done
+REPOSITORY            TAG            SIZE
+civicpulse-backend    latest         298MB
+civicpulse-frontend   latest         92.9MB
+
+=== 3. stack up
+$ docker compose up -d --quiet-pull
+ Network civicpulse_edge Creating 
+ Network civicpulse_internal Creating 
+ Network civicpulse_edge Creating 
+ Network civicpulse_internal Creating 
+ Network civicpulse_edge Created 
+ Network civicpulse_edge Created 
+ Network civicpulse_internal Created 
+ Network civicpulse_internal Created 
+ Container civicpulse-postgres-1 Creating 
+ Container civicpulse-redis-1 Creating 
+ Container civicpulse-redis-1 Created 
+ Container civicpulse-postgres-1 Created 
+ Container civicpulse-backend-1 Creating 
+ Container civicpulse-backend-1 Created 
+ Container civicpulse-frontend-1 Creating 
+ Container civicpulse-frontend-1 Created 
+ Container civicpulse-redis-1 Starting 
+ Container civicpulse-postgres-1 Starting 
+ Container civicpulse-redis-1 Started 
+ Container civicpulse-postgres-1 Started 
+ Container civicpulse-postgres-1 Waiting 
+ Container civicpulse-redis-1 Waiting 
+ Container civicpulse-redis-1 Healthy 
+ Container civicpulse-postgres-1 Healthy 
+ Container civicpulse-backend-1 Starting 
+ Container civicpulse-backend-1 Started 
+ Container civicpulse-backend-1 Waiting 
+ Container civicpulse-backend-1 Healthy 
+ Container civicpulse-frontend-1 Starting 
+ Container civicpulse-frontend-1 Started 
+PASS  backend becomes ready
+$ docker compose ps
+NAME                    IMAGE                  COMMAND                  SERVICE    CREATED          STATUS                           PORTS
+civicpulse-backend-1    civicpulse-backend     "./entrypoint.sh uvi…"   backend    22 seconds ago   Up 14 seconds (healthy)          0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+civicpulse-frontend-1   civicpulse-frontend    "/docker-entrypoint.…"   frontend   22 seconds ago   Up 1 second (health: starting)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+civicpulse-postgres-1   postgres:16.6-alpine   "docker-entrypoint.s…"   postgres   23 seconds ago   Up 20 seconds (healthy)          5432/tcp
+civicpulse-redis-1      redis:7.4.1-alpine     "docker-entrypoint.s…"   redis      23 seconds ago   Up 20 seconds (healthy)          6379/tcp
+
+=== 4. image contents
+$ docker compose exec -T backend id
+uid=10001(app) gid=999(app) groups=999(app)
+PASS  backend runs as non-root
+$ docker compose exec -T frontend id
+uid=101(nginx) gid=101(nginx) groups=101(nginx)
+PASS  frontend runs as non-root
+PASS  frontend image has no node
+PASS  frontend image has no node_modules
+$ docker compose exec -T frontend ls /usr/share/nginx/html
+ls: C:/Program Files/Git/usr/share/nginx/html: No such file or directory
+
+=== 5. frontend and probes
+PASS  frontend serves the app shell
+$ curl -sS -i http://localhost:8000/health
+HTTP/1.1 200 OK
+date: Fri, 25 Sep 2026 05:38:45 GMT
+server: uvicorn
+content-length: 15
+content-type: application/json
+x-request-id: aaf1c757-e36f-49af-9201-351c152e2234
+
+{"status":"ok"}$ curl -sS -i http://localhost:8000/ready
+HTTP/1.1 200 OK
+date: Fri, 25 Sep 2026 05:38:46 GMT
+server: uvicorn
+content-length: 18
+content-type: application/json
+x-request-id: 94154c09-5cae-42f7-a39e-1e4c5f54b283
+
+{"status":"ready"}PASS  /health 200
+PASS  /ready 200 (postgres + redis)
+PASS  /metrics has request counter
+
+=== 6. create, retrieve, stats cache (through the frontend proxy)
+{
+  "id": "d789eacd-a6ba-4dbb-8adf-18558ee7a521",
+  "text": "Burst water main flooding Street 12, water entering ground floors",
+  "location": "Street 12",
+  "reporter_contact": null,
+  "category": "sanitation",
+  "priority": "normal",
+  "status": "open",
+  "ai_summary": "Burst water main flooding Street 12, water entering ground floors",
+  "triaged_by": "simulated",
+  "triage_latency_ms": 1,
+  "created_at": "2026-09-25T05:38:47.458432Z",
+  "updated_at": "2026-09-25T05:38:47.458440Z"
+}
+PASS  GET complaint back
+HTTP/1.1 200 OK
+x-cache: MISS
+HTTP/1.1 200 OK
+x-cache: HIT
+$ curl /api/meta/providers
+{"active":"simulated","n_recent":20,"triage_cache":{"hits":0,"misses":1,"hit_rate":0.0,"scope":"this process since start"}}
+
+=== 7. status transitions and 409
+open -> in_progress: HTTP 200
+PASS  valid transition 200
+in_progress -> open: HTTP 409
+{"detail":"Invalid status transition: in_progress -> open"}
+PASS  invalid transition 409
+PASS  409 names the transition
+unknown id: HTTP 404
+PASS  404 for unknown id
+invalid body: HTTP 400
+{"detail":[{"loc":["body","text"],"msg":"String should have at least 10 characters"},{"loc":["body","location"],"msg":"String should have at least 3 characters"}]}
+PASS  400 with field errors
+
+=== 8. rate limit (per client IP, limit is RATE_LIMIT_PER_MINUTE, default 20)
+25 requests from one client: 20 x 201, 5 x 429, header: retry-after: 6
+PASS  some requests were rate limited
+PASS  429 carries Retry-After
+PASS  a different client is not limited
+
+=== 8b. the limiter cannot be bypassed by a spoofed X-Forwarded-For (through the frontend proxy)
+30 POSTs via the proxy with rotating spoofed first hops: 27 x 201, 3 x 429
+limiter keys in redis:
+rl:172.18.0.1:29838579rl:172.18.0.1:29838578
+PASS  spoofed first hops do not evade the limit
+PASS  spoofed hops share one limiter key
+
+=== 9. network isolation
+civicpulse_edge	bridge	internal=false
+civicpulse_internal	bridge	internal=true
+$ docker network inspect civicpulse_edge --format {{.Name}} internal={{.Internal}} members={{range .Containers}}{{.Name}} {{end}}
+civicpulse_edge internal=false members=civicpulse-frontend-1 civicpulse-backend-1 
+$ docker network inspect civicpulse_internal --format {{.Name}} internal={{.Internal}} members={{range .Containers}}{{.Name}} {{end}}
+civicpulse_internal internal=true members=civicpulse-redis-1 civicpulse-postgres-1 civicpulse-backend-1 
+-- frontend -> postgres (must fail)
+$ docker compose exec -T frontend ping -c1 -W2 postgres
+ping: bad address 'postgres'
+PASS  frontend cannot reach postgres
+-- frontend -> redis (must fail)
+$ docker compose exec -T frontend ping -c1 -W2 redis
+ping: bad address 'redis'
+PASS  frontend cannot reach redis
+PASS  frontend can reach backend
+PASS  backend can reach postgres:5432
+PASS  backend can reach redis:6379
+-- outbound from the internal network (must fail)
+PASS  wget exists in the postgres image (so the next result is about the network)
+$ docker compose exec -T postgres sh -c wget -T4 -O- http://example.com
+wget: bad address 'example.com'
+PASS  postgres has no outbound route
+PASS  backend has outbound route via edge
+
+=== 10. redis down: readiness and degradation
+$ docker compose stop redis
+ Container civicpulse-redis-1 Stopping 
+ Container civicpulse-redis-1 Stopped 
+$ curl -sS -i http://localhost:8000/ready
+HTTP/1.1 503 Service Unavailable
+date: Fri, 25 Sep 2026 05:39:48 GMT
+server: uvicorn
+content-length: 41
+content-type: application/json
+x-request-id: a6d0d6c3-6439-4d8e-9e39-767ebd22c11a
+
+{"status":"unavailable","failed":"redis"}PASS  /ready is 503 when redis is down
+PASS  503 body names redis
+PASS  /health still 200 with redis down
+-- create with redis down (cache misses, limiter fails open)
+HTTP 201
+$ docker compose start redis
+ Container civicpulse-redis-1 Starting 
+ Container civicpulse-redis-1 Started 
+PASS  ready again after redis returns
+
+=== 11. provider failure -> rules fallback (unreachable LLM endpoint, dummy key)
+$ docker compose up -d --force-recreate backend
+ Container civicpulse-postgres-1 Running 
+ Container civicpulse-redis-1 Running 
+ Container civicpulse-backend-1 Recreate 
+ Container civicpulse-backend-1 Recreated 
+ Container civicpulse-postgres-1 Waiting 
+ Container civicpulse-redis-1 Waiting 
+ Container civicpulse-postgres-1 Healthy 
+ Container civicpulse-redis-1 Healthy 
+ Container civicpulse-backend-1 Starting 
+ Container civicpulse-backend-1 Started 
+PASS  backend ready with a broken provider
+$ curl /api/meta/providers
+{"active":"llm:groq","recent":[{"provider":"simulated","latency_ms":7709,"fallback":false},{"provider":"simulated","latency_ms":0,"fallback":false},{"provider":"simulated","latency_ms":0,"fallback":false}]}
+POST -> HTTP 201
+PASS  still 201 when the provider fails
+$ curl newest complaint
+{"triaged_by":"rules:fallback","category":"sanitation","priority":"normal","ai_summary":"Sewer overflowing into the street near the school (run 179031468028319)"}
+PASS  triaged_by is rules:fallback
+{"ts": "2026-09-25T05:40:29.915107+00:00", "level": "WARNING", "logger": "civicpulse.triage", "message": "triage fallback", "request_id": "ed43fd53-1b30-4021-9e5d-32740a9c8447", "complaint_id": "e64e50a6-fa86-4b48-bf05-9799bdd901c5", "provider": "llm:groq", "error_class": "TriageError"}
+triage_fallback_total{provider="llm:groq"} 1.0
+$ docker compose up -d --force-recreate backend
+ Container civicpulse-redis-1 Running 
+ Container civicpulse-postgres-1 Running 
+ Container civicpulse-backend-1 Recreate 
+ Container civicpulse-backend-1 Recreated 
+ Container civicpulse-postgres-1 Waiting 
+ Container civicpulse-redis-1 Waiting 
+ Container civicpulse-postgres-1 Healthy 
+ Container civicpulse-redis-1 Healthy 
+ Container civicpulse-backend-1 Starting 
+ Container civicpulse-backend-1 Started 
+PASS  backend back on the default provider
+
+=== 12. persistence: down (no -v) then up
+total before: 206
+$ docker compose down
+ Container civicpulse-frontend-1 Stopping 
+ Container civicpulse-frontend-1 Stopped 
+ Container civicpulse-frontend-1 Removing 
+ Container civicpulse-frontend-1 Removed 
+ Container civicpulse-backend-1 Stopping 
+ Container civicpulse-backend-1 Stopped 
+ Container civicpulse-backend-1 Removing 
+ Container civicpulse-backend-1 Removed 
+ Container civicpulse-redis-1 Stopping 
+ Container civicpulse-postgres-1 Stopping 
+ Container civicpulse-redis-1 Stopped 
+ Container civicpulse-redis-1 Removing 
+ Container civicpulse-postgres-1 Stopped 
+ Container civicpulse-postgres-1 Removing 
+ Container civicpulse-redis-1 Removed 
+ Container civicpulse-postgres-1 Removed 
+ Network civicpulse_edge Removing 
+ Network civicpulse_internal Removing 
+ Network civicpulse_internal Removed 
+ Network civicpulse_edge Removed 
+$ docker compose up -d --quiet-pull
+ Network civicpulse_edge Creating 
+ Network civicpulse_internal Creating 
+ Network civicpulse_edge Creating 
+ Network civicpulse_internal Creating 
+ Network civicpulse_edge Created 
+ Network civicpulse_edge Created 
+ Network civicpulse_internal Created 
+ Network civicpulse_internal Created 
+ Container civicpulse-postgres-1 Creating 
+ Container civicpulse-redis-1 Creating 
+ Container civicpulse-redis-1 Created 
+ Container civicpulse-postgres-1 Created 
+ Container civicpulse-backend-1 Creating 
+ Container civicpulse-backend-1 Created 
+ Container civicpulse-frontend-1 Creating 
+ Container civicpulse-frontend-1 Created 
+ Container civicpulse-redis-1 Starting 
+ Container civicpulse-postgres-1 Starting 
+ Container civicpulse-redis-1 Started 
+ Container civicpulse-postgres-1 Started 
+ Container civicpulse-postgres-1 Waiting 
+ Container civicpulse-redis-1 Waiting 
+ Container civicpulse-redis-1 Healthy 
+ Container civicpulse-postgres-1 Healthy 
+ Container civicpulse-backend-1 Starting 
+ Container civicpulse-backend-1 Started 
+ Container civicpulse-backend-1 Waiting 
+ Container civicpulse-backend-1 Healthy 
+ Container civicpulse-frontend-1 Starting 
+ Container civicpulse-frontend-1 Started 
+PASS  ready after down/up
+total after: 206
+PASS  row count preserved
+PASS  the created complaint still exists
+civicpulse_pgdata
+civicpulse_redisdata
+
+=== 13. graceful shutdown
+-- A. an in-flight request must survive SIGTERM: upload a ~1.2 KB body at 300 B/s (~4 s) and signal 1.5 s in
+1273 /tmp/slow.json
+SIGTERM sent at 1790314866.809002300
+$ docker compose kill -s SIGTERM backend
+ Container civicpulse-backend-1 Killing 
+ Container civicpulse-backend-1 Killed 
+container exit code: 0 at 1790314870.540477900
+in-flight request answered HTTP 201 at 1790314874.803355100
+$ docker logs --tail 6 6ff60e40b54e5f07c71932f8ef9d16eb2d1c340e070abe87072044685ec28413
+{"ts": "2026-09-25T05:41:07.737385+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Shutting down", "request_id": "-"}
+{"ts": "2026-09-25T05:41:07.838640+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Waiting for connections to close. (CTRL+C to force quit)", "request_id": "-"}
+{"ts": "2026-09-25T05:41:09.324949+00:00", "level": "INFO", "logger": "civicpulse.http", "message": "request", "request_id": "b28d1c74-797a-4edf-b2a3-1f4f9219024e", "method": "POST", "path": "/api/complaints", "status": 201, "duration_ms": 4029.2}
+{"ts": "2026-09-25T05:41:09.350668+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Waiting for application shutdown.", "request_id": "-"}
+{"ts": "2026-09-25T05:41:09.352849+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Application shutdown complete.", "request_id": "-"}
+{"ts": "2026-09-25T05:41:09.353076+00:00", "level": "INFO", "logger": "uvicorn.error", "message": "Finished server process [1]", "request_id": "-", "color_message": "Finished server process [\u001b[36m%d\u001b[0m]"}
+PASS  in-flight request completed with 201
+PASS  it completed after SIGTERM was sent (was really in flight)
+PASS  backend exited 0
+$ docker compose up -d --quiet-pull backend
+ Container civicpulse-postgres-1 Running 
+ Container civicpulse-redis-1 Running 
+ Container civicpulse-postgres-1 Waiting 
+ Container civicpulse-redis-1 Waiting 
+ Container civicpulse-postgres-1 Healthy 
+ Container civicpulse-redis-1 Healthy 
+ Container civicpulse-backend-1 Starting 
+ Container civicpulse-backend-1 Started 
+PASS  backend restarts cleanly
+PASS  the in-flight complaint was persisted
+-- B. new requests after SIGTERM are refused, not half-served (sequential loop)
+$ docker compose kill -s SIGTERM backend
+ Container civicpulse-backend-1 Killing 
+ Container civicpulse-backend-1 Killed 
+ordered codes, run-length encoded:
+      9 200
+    141 000
+PASS  no success after the first failure (failures only at the tail)
+PASS  no 5xx
+$ docker compose up -d --quiet-pull backend
+ Container civicpulse-postgres-1 Running 
+ Container civicpulse-redis-1 Running 
+ Container civicpulse-redis-1 Waiting 
+ Container civicpulse-postgres-1 Waiting 
+ Container civicpulse-redis-1 Healthy 
+ Container civicpulse-postgres-1 Healthy 
+ Container civicpulse-backend-1 Starting 
+ Container civicpulse-backend-1 Started 
+PASS  backend restarts cleanly again
+
+=== summary
+PASS=48 FAIL=0
