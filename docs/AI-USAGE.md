@@ -10,6 +10,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | backend triage cache scope (llm.py, ollama.py, triage_service.py, tests, TRIAGE.md) | Reproduced the stale-model cache hit on merged dev, added cache_scope, two regression tests verified to fail without the fix | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | docs/evidence/k8s-repeat, k8s-run.md repeat section | Added the results of a repeat kind run and noted what did and did not repeat | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | README/RUNBOOK status, scripts/evidence_compose.sh step 8b, review of PR #46 | Reproduced the X-Forwarded-For bypass and the fix on runners before approving; added the missing through-proxy check; updated status lines | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | scripts/evidence_compose.sh, evidence workflow, docs/evidence/compose-* | Wrote the evidence script and workflow, read the runner transcript, tightened checks I found weak, wrote the summary from the real output | _pending review_ (results are from one CI run on a GitHub runner) |
 | 2026-09-25 | Claude Code / BETA | scripts/evidence_k8s.sh, plot_hpa.py, load/k6-script.js, evidence-k8s workflow, docs/evidence/k8s* | Wrote the scripts and workflow, read the runner artifacts critically (found and fixed a weak lag definition and an HPA-status lag), wrote the summary from the real output | _pending review_ (two runs on one shared runner) |
@@ -29,6 +30,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | 2026-09-25 | Claude Code / ALPHA | Backend data layer | Domain enums and state machine, models, Alembic migration, repository, ComplaintService, idempotent seed, backend Dockerfile and entrypoint, tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend HTTP API | FastAPI app, routes, Redis stats cache + rate limiter + triage cache, health/ready/metrics, JSON logging, API tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend audit fixes and docs | Factory/env handling fixes, k8s backend init-container change, extra Redis/config tests, TRIAGE.md, ADR 0001 (provider interface) and 0004 (PII), engineering notes 4 and 8 and index justifications. Also renamed the frontend ADR to 0002 to match the required ADR set. | _pending review by BETA_ |
+| 2026-09-25 | Claude Code / ALPHA | Compose evidence on a laptop, script portability | Ran the evidence script on real Docker, found and fixed the rate-limit and cache-key defects (#46, #50), patched the script for Windows and per-run text, wrote the laptop evidence note | _pending review by BETA_ |
 
 
 
