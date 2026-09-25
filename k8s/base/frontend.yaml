@@ -16,7 +16,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: frontend
-          image: ghcr.io/abdullah-se-bit/civicpulse-frontend:latest # overlays pin the tag
+          image: ghcr.io/abdullah-se-bit/civicpulse-frontend:set-by-overlay # placeholder, replaced by the overlays; not a real tag
           ports: [{ containerPort: 8080, name: http }]
           securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false }
           readinessProbe:

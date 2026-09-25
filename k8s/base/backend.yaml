@@ -20,7 +20,7 @@ spec:
         # one rollout can still race on `upgrade head`; Alembic's transactional DDL on Postgres makes that safe
         # enough here, move to a Job if migrations get long.
         - name: migrate
-          image: ghcr.io/abdullah-se-bit/civicpulse-backend:latest # overlays pin the tag
+          image: ghcr.io/abdullah-se-bit/civicpulse-backend:set-by-overlay # placeholder, replaced by the overlays; not a real tag
           # `command` replaces the image ENTRYPOINT, so this is the only place migrations and the idempotent seed run.
           command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
 
@@ -29,7 +29,7 @@ spec:
             - secretRef: { name: civicpulse-secrets }
       containers:
         - name: backend
-          image: ghcr.io/abdullah-se-bit/civicpulse-backend:latest # overlays pin the tag
+          image: ghcr.io/abdullah-se-bit/civicpulse-backend:set-by-overlay # placeholder, replaced by the overlays; not a real tag
           ports: [{ containerPort: 8000, name: http }]
           envFrom:
             - configMapRef: { name: civicpulse-config }

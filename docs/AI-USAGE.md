@@ -9,6 +9,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | k8s/base image placeholders | Replaced :latest placeholders with a non-pullable set-by-overlay tag; verified by rendering both overlays with kustomize v5.4.3 | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/evidence/cd-run.md, README, ENGINEERING-NOTES Q2/Q3 | Read the first cd.yml run logs and artifacts and wrote up what they show; corrected statements that said cd.yml had never run | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | backend triage cache scope (llm.py, ollama.py, triage_service.py, tests, TRIAGE.md) | Reproduced the stale-model cache hit on merged dev, added cache_scope, two regression tests verified to fail without the fix | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/evidence/k8s-repeat, k8s-run.md repeat section | Added the results of a repeat kind run and noted what did and did not repeat | _pending review_ |
