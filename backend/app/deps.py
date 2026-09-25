@@ -38,11 +38,12 @@ def get_complaint_service(
 
 
 def client_id(request: Request) -> str:
-    # ponytail: trusts the first X-Forwarded-For hop set by the ingress/nginx; harden with a trusted-proxy list
-    # if the backend is ever exposed directly.
+    # Exactly one trusted proxy (nginx / ingress) sits in front and APPENDS the peer address it saw, so the LAST hop
+    # is the only one a client cannot choose; earlier hops are whatever the client sent. ponytail: if the backend
+    # is reachable directly (dev port 8000) the header is fully client-controlled; use a trusted-proxy list then.
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 

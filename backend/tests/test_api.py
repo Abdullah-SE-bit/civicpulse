@@ -110,6 +110,19 @@ def test_rate_limit_returns_429_with_retry_after_and_is_shared_across_replicas(e
     assert blocked.status_code == 429 and int(blocked.headers["Retry-After"]) > 0
 
 
+def test_rate_limit_cannot_be_bypassed_by_spoofing_earlier_forwarded_hops(engine):
+    with make_client(engine, limit=2) as c:
+        body = {**BODY}
+        # nginx appends the real peer as the last hop; the client controls everything before it
+        codes = [
+            c.post("/api/complaints", json=body, headers={"X-Forwarded-For": f"10.9.9.{i}, 172.18.0.1"}).status_code
+            for i in range(4)
+        ]
+        other = c.post("/api/complaints", json=body, headers={"X-Forwarded-For": "10.9.9.1, 172.18.0.2"})
+    assert codes == [201, 201, 429, 429]
+    assert other.status_code == 201  # a genuinely different peer is not limited
+
+
 def test_provider_that_always_raises_still_returns_201_with_rules_fallback(engine):
     with make_client(engine, provider=SimulatedTriage("raise")) as c:
         r = c.post("/api/complaints", json=BODY)
