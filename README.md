@@ -56,7 +56,7 @@ Everything comes from environment variables (see `.env.example`); nothing secret
 |---|---|
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | database credentials; `.env` is gitignored |
 | `DATABASE_URL`, `REDIS_URL` | must use the service names `postgres` and `redis` in Compose/Kubernetes, not `localhost` |
-| `TRIAGE_PROVIDER` | `simulated` (code default), `rules`, `ollama`, `llm` |
+| `TRIAGE_PROVIDER` | `.env.example` sets `rules` (keyword rules, no key needed); the code default is `simulated` (hash-based fake for tests: its labels are meaningless), or `ollama`, `llm` |
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_VENDOR` | for `llm` (`groq` or `gemini`). With an empty key the backend serves `rules` and logs a warning |
 | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | for `ollama` (`--profile ollama`) |
 | `RATE_LIMIT_PER_MINUTE` | per-client limit on `POST /api/complaints` (default 20) |
