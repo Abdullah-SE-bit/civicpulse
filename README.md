@@ -49,6 +49,17 @@ docker compose up --build
 ```
 Open http://localhost:8080 (UI) and http://localhost:8000/docs (API docs, dev stack only). The backend runs migrations and seeds 30+ sample complaints on first start; the seed is idempotent.
 
+## Screenshots
+Real screenshots of the running stack (headless Chromium driving the Compose quickstart on a CI runner; details and caveats in [docs/evidence/ui-run.md](docs/evidence/ui-run.md)).
+
+| Submit: result of AI triage | Dashboard: server's 409 message shown verbatim |
+|---|---|
+| ![Submit result](docs/screenshots/04-submit-result.png) | ![Dashboard 409](docs/screenshots/08-dashboard-409-server-message.png) |
+
+| Submit: in-flight state (response delayed 2.5 s to make it visible) | Stats: cache HIT |
+|---|---|
+| ![Loading](docs/screenshots/03-submit-loading-delayed-2.5s.png) | ![Stats](docs/screenshots/10-stats-cache-hit.png) |
+
 ## Configuration
 Everything comes from environment variables (see `.env.example`); nothing secret is committed.
 
