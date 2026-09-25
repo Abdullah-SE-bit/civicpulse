@@ -40,8 +40,9 @@ class TriageOutcome:
     cache_hit: bool = False
 
 
-def content_key(text: str, location: str) -> str:
-    norm = " ".join(text.lower().split()) + "|" + " ".join(location.lower().split())
+def content_key(provider: str, text: str, location: str) -> str:
+    """Scoped to the provider: a result from `simulated` or `rules` must never be served as an LLM result."""
+    norm = provider + "|" + " ".join(text.lower().split()) + "|" + " ".join(location.lower().split())
     return "triage:" + hashlib.sha256(norm.encode()).hexdigest()
 
 
@@ -70,7 +71,7 @@ class TriageService:
 
     def triage(self, text: str, location: str, complaint_id: str = "-") -> TriageOutcome:
         start = time.perf_counter()
-        key = content_key(text, location)
+        key = content_key(self._provider.name, text, location)
         if self._cache is not None and (hit := self._cache.get(key)):
             cached_by, _, payload = hit.partition("\n")
             result = TriageResult.model_validate_json(payload)
