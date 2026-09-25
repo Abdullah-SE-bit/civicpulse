@@ -19,7 +19,7 @@ jobs:
         run: |
           set -x
           mkdir /tmp/fresh && cd /tmp/fresh
-          git clone https://github.com/Abdullah-SE-bit/civicpulse.git && cd civicpulse
+          git clone --branch "$GITHUB_REF_NAME" https://github.com/Abdullah-SE-bit/civicpulse.git && cd civicpulse
           git log --oneline -1
           cp .env.example .env
           docker compose up --build -d
