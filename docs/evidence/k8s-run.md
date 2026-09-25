@@ -67,3 +67,16 @@ The script then applied only the CPU target (`kubectl set resources deploy/backe
 - No SIGTERM test on Kubernetes (Compose only, see `compose-run.md`), and no NetworkPolicy exists.
 - The load generator shared the machine with the cluster; no repetition beyond the two runs above.
 - `cd.yml`/`release.yml` have still not run.
+
+## Repeat run
+The same workflow was run again on a fresh runner from `dev` after later changes (workflow `evidence-k8s`, run [36099968739](https://github.com/Abdullah-SE-bit/civicpulse/actions/runs/36099968739)): 22 of 22 checks passed. Lag numbers, HPA capture, k6 summary and chart are in [`k8s-repeat/`](k8s-repeat/).
+
+| | run 36056340936 run 1 | run 36056340936 run 2 | repeat run 1 | repeat run 2 |
+|---|---|---|---|---|
+| HPA decision, s after load arrived | 27 | 33 | 34 | 33 |
+| first new pod Ready, s | 36 | 42 | 43 | 41 |
+| max replicas | 10 | 9 | 10 | 9 |
+| CPU request at start of the run | 100m | 163m (VPA target) | 100m | 109m (VPA target) |
+| k6 requests / failed | 30,499 / 0 | 30,499 / 0 | 30,499 / 0 | 30,499 / 0 |
+
+What repeats: a decision 27-34 s after the load arrives and a first Ready pod 36-43 s after (so about 8-9 s from decision to Ready every time), 10 replicas at the initial 100m request and 9 after applying the VPA CPU target. What does not: the VPA CPU target itself was **93m, 163m and 109m** in three runs of identical setup, so it is not a stable number at this history length, and the intermediate replica steps differed (`2 -> 4 -> 8 -> 10` in one run, `2 -> 6 -> 7 -> 10` in another). The latency figures (p95 7.2 ms in the repeat, 11.7-13.5 ms before) vary more between runs than between configurations, which is why no performance improvement is claimed from the second configuration.
