@@ -71,7 +71,8 @@ class TriageService:
 
     def triage(self, text: str, location: str, complaint_id: str = "-") -> TriageOutcome:
         start = time.perf_counter()
-        key = content_key(self._provider.name, text, location)
+        # Providers whose output depends on more than their name (an LLM model) expose cache_scope.
+        key = content_key(str(getattr(self._provider, "cache_scope", self._provider.name)), text, location)
         if self._cache is not None and (hit := self._cache.get(key)):
             cached_by, _, payload = hit.partition("\n")
             result = TriageResult.model_validate_json(payload)

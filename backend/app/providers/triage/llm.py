@@ -31,6 +31,8 @@ class LLMTriage:
         client: httpx.Client | None = None,
     ) -> None:
         self.name = f"llm:{vendor}"
+        # Part of the triage cache key: a different model must not be served this model's cached answers.
+        self.cache_scope = f"{self.name}:{model}"
         self._model = model
         self._url = base_url.rstrip("/") + "/chat/completions"
         self._headers = {"Authorization": f"Bearer {api_key}"}

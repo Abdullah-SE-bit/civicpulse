@@ -19,6 +19,7 @@ class OllamaTriage:
     def __init__(self, base_url: str, model: str, client: httpx.Client | None = None) -> None:
         self._model = model
         self._url = base_url.rstrip("/") + "/api/chat"
+        self.cache_scope = f"{self.name}:{model}"  # see LLMTriage: cache key includes the model
         self._client = client or httpx.Client(timeout=TIMEOUT_SECONDS)
 
     def triage(self, text: str, location: str) -> TriageResult:

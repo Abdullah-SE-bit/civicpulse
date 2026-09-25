@@ -204,3 +204,40 @@ def test_result_schema_bounds():
     with pytest.raises(ValueError):
         TriageResult(category="water", priority="high", summary="x" * 141, confidence=0.5)
     assert issubclass(TriageError, Exception)
+
+
+def _fake_model_client(seen: list[str]) -> httpx.Client:
+    def handler(request: httpx.Request) -> httpx.Response:
+        model = json.loads(request.content)["model"]
+        seen.append(model)
+        cat = "water" if model == "model-a" else "roads"
+        return chat(json.dumps({"category": cat, "priority": "normal", "summary": model, "confidence": 0.9}))
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_cache_is_scoped_to_the_model_not_just_the_vendor():
+    # Same vendor ("llm:groq"), different model: the second must call its own model, not reuse the first's answer.
+    cache, seen = DictCache(), []
+    a, _ = make_service(LLMTriage("k", "https://llm.test/v1", "model-a", client=_fake_model_client(seen)), cache)
+    b, _ = make_service(LLMTriage("k", "https://llm.test/v1", "model-b", client=_fake_model_client(seen)), cache)
+    first, second = a.triage(TEXT, LOC), b.triage(TEXT, LOC)
+    assert (first.result.category, second.result.category) == (Category.water, Category.roads)
+    assert not second.cache_hit and seen == ["model-a", "model-b"] and len(cache.data) == 2
+    assert a.triage(TEXT, LOC).cache_hit  # the same model still hits its own entry
+
+
+def test_ollama_cache_is_scoped_to_the_model():
+    def handler(request: httpx.Request) -> httpx.Response:
+        m = json.loads(request.content)["model"]
+        return httpx.Response(200, json={"message": {"content": json.dumps(
+            {"category": "water", "priority": "normal", "summary": m, "confidence": 0.5})}})
+
+    def svc(model: str) -> TriageService:
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        return make_service(OllamaTriage("http://ollama:11434", model, client=client), cache)[0]
+
+    cache = DictCache()
+    assert svc("llama3.2:1b").triage(TEXT, LOC).result.summary == "llama3.2:1b"
+    other = svc("qwen2.5:0.5b").triage(TEXT, LOC)
+    assert other.result.summary == "qwen2.5:0.5b" and not other.cache_hit
