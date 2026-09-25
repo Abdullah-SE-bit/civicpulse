@@ -9,6 +9,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | docs/evidence/ci-gate.md, ci-red-blocked.png | Ran the red-then-green demo PR, read the run and PR status, described the user's screenshot; did not create the screenshot | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | scripts/evidence_rollout.sh, load/k6-rollout.js, evidence-rollout workflow, docs/evidence/rollout* | Wrote the scripts, reran the test when the first run failed, added per-failure logging, wrote up the mixed result without claiming zero downtime | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | k8s/base image placeholders | Replaced :latest placeholders with a non-pullable set-by-overlay tag; verified by rendering both overlays with kustomize v5.4.3 | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/evidence/cd-run.md, README, ENGINEERING-NOTES Q2/Q3 | Read the first cd.yml run logs and artifacts and wrote up what they show; corrected statements that said cd.yml had never run | _pending review_ |
