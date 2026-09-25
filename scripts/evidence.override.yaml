@@ -1,0 +1,6 @@
+# Used only by scripts/evidence_compose.sh: run the backend exactly as the image starts (no --reload, no source mount)
+# so shutdown and restart behaviour is that of the shipped image, not the hot-reload dev setup.
+services:
+  backend:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes: !reset []

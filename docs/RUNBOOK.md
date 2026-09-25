@@ -1,6 +1,6 @@
 # Runbook
 
-> **Status of this document:** the commands are written from the manifests and code. None of the Docker, Compose or Kubernetes commands below have been run yet (Docker was not installed on the machine that wrote it). Treat them as the intended procedure and correct this file the first time one does not behave as written.
+> **Status of this document:** the Compose commands (`up`, `down` without `-v`, `stop`/`start redis`, `kill -s SIGTERM`, the health/readiness/metrics curls) were exercised by `scripts/evidence_compose.sh` on a GitHub runner, see `docs/evidence/compose-run.md`. **The Kubernetes commands have not been run**: no cluster has been available. Correct this file the first time one does not behave as written.
 
 Service names: `frontend` (nginx, port 8080), `backend` (FastAPI, 8000), `postgres` (5432), `redis` (6379), optional `ollama` (11434). Kubernetes namespace: `civicpulse`.
 

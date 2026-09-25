@@ -9,10 +9,10 @@ The engineering point is that the *reader* is replaceable: today keyword rules, 
 ## Status (what is and is not verified)
 | Area | State |
 |---|---|
-| Backend tests, lint, types; frontend tests, lint, types; kustomize + kubeconform on the prod overlay | passed in CI on a real runner (run 36046507953). Check the badge for the current state |
-| Image build + Trivy scan in CI | was failing (wrong Trivy action tag); fixed in PR #28, result not yet confirmed here |
-| Docker Compose stack, network isolation, persistence | written, **not yet run** (Docker not installed on the authors' machines so far) |
-| Kubernetes manifests, HPA/VPA, load test, rollback | written, **not yet applied to a cluster**; no measurements exist |
+| Backend tests, lint, types; frontend tests, lint, types; kustomize + kubeconform on the prod overlay | pass in CI on a real runner (run 36053169219, `dev`). Check the badge for the current state |
+| Image build + Trivy scan in CI | pass (run 36053169219). They failed twice first: a non-existent Trivy action tag, then 44 + 38 HIGH/CRITICAL base-image findings, fixed by newer base tags and OS package upgrades |
+| Docker Compose stack, network isolation, persistence, failure and SIGTERM behaviour | **run on a GitHub runner** (not a laptop): 46 checks passed. See [docs/evidence/compose-run.md](docs/evidence/compose-run.md). The CI `integration` job also passes |
+| Kubernetes manifests (validated by kubeconform only), HPA/VPA, load test, rollback | **not yet applied to a cluster**; no scaling measurements exist |
 | cd.yml / release.yml | written, never run |
 
 ## Architecture
@@ -41,7 +41,7 @@ flowchart LR
 - Schema comes only from Alembic migrations.
 
 ## Quickstart (Docker Compose)
-Not yet verified from a clean clone: see Status.
+The Compose stack is exercised in CI on every push to `dev`; a manual run from a fresh clone on a laptop has not been done.
 ```bash
 git clone https://github.com/Abdullah-SE-bit/civicpulse.git && cd civicpulse
 cp .env.example .env        # placeholders; the default provider needs no key
