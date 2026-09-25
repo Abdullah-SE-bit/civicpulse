@@ -12,7 +12,7 @@ The engineering point is that the *reader* is replaceable: today keyword rules, 
 | Backend tests, lint, types; frontend tests, lint, types; kustomize + kubeconform on the prod overlay | pass in CI on a real runner (run 36053169219, `dev`). Check the badge for the current state |
 | Image build + Trivy scan in CI | pass (run 36053169219). They failed twice first: a non-existent Trivy action tag, then 44 + 38 HIGH/CRITICAL base-image findings, fixed by newer base tags and OS package upgrades |
 | Docker Compose stack, network isolation, persistence, failure and SIGTERM behaviour | **run on a GitHub runner** (not a laptop): 46 checks passed. See [docs/evidence/compose-run.md](docs/evidence/compose-run.md). The CI `integration` job also passes |
-| Kubernetes manifests (validated by kubeconform only), HPA/VPA, load test, rollback | **not yet applied to a cluster**; no scaling measurements exist |
+| Kubernetes: probes, StatefulSet persistence, Redis-down behaviour, HPA scale-out under k6 load, VPA recommendation | **run on kind inside a GitHub runner** (shared 4 vCPU, not a laptop or a real cluster): 22 checks passed; HPA scaled 2 -> 10 replicas under 120 req/s; charts and the `kubectl get hpa -w` capture are committed. See [docs/evidence/k8s-run.md](docs/evidence/k8s-run.md). Rolling update under load, the rollback procedures and a real `cd.yml` deploy are **not yet run** |
 | cd.yml / release.yml | written, never run |
 
 ## Architecture
