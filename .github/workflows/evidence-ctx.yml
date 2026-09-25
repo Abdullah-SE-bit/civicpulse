@@ -1,0 +1,40 @@
+name: evidence-ctx
+
+# Throwaway replication of the build-context measurement in docs/evidence/docker-context-sizes.md on Linux.
+on:
+  push:
+    branches: ["evidence-ctx/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  ctx:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Measure bytes that pass the ignore filter (clean checkout = what a fresh clone sends)
+        run: |
+          docker --version
+          for ctx in backend frontend; do
+            cd "$GITHUB_WORKSPACE/$ctx"
+            printf 'FROM scratch\nCOPY . /ctx\n' > /tmp/Dockerfile.probe
+            echo "== $ctx: files in the checkout: $(git ls-files . | wc -l), bytes on disk: $(du -sb . | cut -f1)"
+            docker build -q -f /tmp/Dockerfile.probe -t probe-$ctx-with . >/dev/null
+            echo "$ctx WITH .dockerignore:    $(docker image inspect probe-$ctx-with --format '{{.Size}}') bytes"
+            mv .dockerignore /tmp/dockerignore.bak
+            docker build -q -f /tmp/Dockerfile.probe -t probe-$ctx-without . >/dev/null
+            echo "$ctx WITHOUT .dockerignore: $(docker image inspect probe-$ctx-without --format '{{.Size}}') bytes"
+            mv /tmp/dockerignore.bak .dockerignore
+          done
+          echo "== simulate what the pattern fix protects against: nested pycache in the backend tree"
+          cd "$GITHUB_WORKSPACE/backend"
+          mkdir -p app/__pycache__ app/providers/__pycache__
+          head -c 200000 /dev/urandom > app/__pycache__/x.cpython-312.pyc
+          head -c 100000 /dev/urandom > app/providers/__pycache__/y.cpython-312.pyc
+          docker build -q -f /tmp/Dockerfile.probe -t probe-backend-pyc . >/dev/null
+          echo "backend WITH current .dockerignore and 300000 bytes of nested .pyc present: $(docker image inspect probe-backend-pyc --format '{{.Size}}') bytes"
+          printf '.git\n.venv\n__pycache__/\n*.pyc\n.env\n.pytest_cache\n.mypy_cache\n.ruff_cache\n.coverage\ntests\n' > .dockerignore
+          docker build -q -f /tmp/Dockerfile.probe -t probe-backend-old . >/dev/null
+          echo "backend WITH the OLD root-only patterns and the same nested .pyc:       $(docker image inspect probe-backend-old --format '{{.Size}}') bytes"
