@@ -22,7 +22,7 @@ jobs:
           cluster_name: civicpulse
           config: scripts/kind-config.yaml
 
-      - name: Install ingress-nginx (no metrics-server on purpose: the HPA must not change replica counts mid-test)
+      - name: "Install ingress-nginx (no metrics-server on purpose - the HPA must not change replica counts mid-test)"
         run: |
           kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/kind/deploy.yaml
           kubectl -n ingress-nginx wait --for=condition=ready pod -l app.kubernetes.io/component=controller --timeout=240s
