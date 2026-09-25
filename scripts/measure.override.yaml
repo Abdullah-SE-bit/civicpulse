@@ -1,0 +1,11 @@
+# Used only by scripts/measure_triage_cache.py. compose.yaml does not pass these two variables through, and the
+# measurement needs (a) a provider with a visible, fixed latency so a cache hit is distinguishable from an inference
+# and (b) a rate limit that does not throttle the workload itself.
+services:
+  backend:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes: !reset []
+    environment:
+      TRIAGE_PROVIDER: simulated
+      SIMULATED_LATENCY_MS: "300"
+      RATE_LIMIT_PER_MINUTE: "1000"

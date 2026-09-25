@@ -9,6 +9,8 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | Date | Tool / session | Area affected | Changes made by AI | Reviewed / modified by the team |
 |------|----------------|---------------|--------------------|---------------------------------|
 | 2026-09-24 | Claude Code / ALPHA | Repo bootstrap | Directory scaffold, .gitignore, .env.example, README, doc skeletons, LICENSE | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | scripts/ui_screenshots.mjs, evidence-ui workflow, docs/screenshots, docs/evidence/ui-run.md, README screenshots | Wrote the Playwright script and workflow, viewed the resulting images to check them, wrote the description from the transcript | _pending review_ |
+| 2026-09-25 | Claude Code / BETA | docs/evidence/ci-gate.md, ci-red-blocked.png | Ran the red-then-green demo PR, read the run and PR status, described the user's screenshot; did not create the screenshot | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | scripts/evidence_rollout.sh, load/k6-rollout.js, evidence-rollout workflow, docs/evidence/rollout* | Wrote the scripts, reran the test when the first run failed, added per-failure logging, wrote up the mixed result without claiming zero downtime | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | k8s/base image placeholders | Replaced :latest placeholders with a non-pullable set-by-overlay tag; verified by rendering both overlays with kustomize v5.4.3 | _pending review_ |
 | 2026-09-25 | Claude Code / BETA | docs/evidence/cd-run.md, README, ENGINEERING-NOTES Q2/Q3 | Read the first cd.yml run logs and artifacts and wrote up what they show; corrected statements that said cd.yml had never run | _pending review_ |
@@ -34,6 +36,7 @@ Per assignment §5.5, AI assistance is disclosed here. Each entry is appended as
 | 2026-09-25 | Claude Code / ALPHA | Backend HTTP API | FastAPI app, routes, Redis stats cache + rate limiter + triage cache, health/ready/metrics, JSON logging, API tests | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Backend audit fixes and docs | Factory/env handling fixes, k8s backend init-container change, extra Redis/config tests, TRIAGE.md, ADR 0001 (provider interface) and 0004 (PII), engineering notes 4 and 8 and index justifications. Also renamed the frontend ADR to 0002 to match the required ADR set. | _pending review by BETA_ |
 | 2026-09-25 | Claude Code / ALPHA | Compose evidence on a laptop, script portability | Ran the evidence script on real Docker, found and fixed the rate-limit and cache-key defects (#46, #50), patched the script for Windows and per-run text, wrote the laptop evidence note | _pending review by BETA_ |
+| 2026-09-26 | Claude Code / ALPHA | Measured evidence: triage cache, Docker context sizes, branch protection; `backend/.dockerignore` fix | Wrote the measurement script and override, ran them on real Docker, found and fixed the nested `__pycache__` ignore patterns, wrote the three evidence notes from the real output | _pending review by BETA_ |
 
 
 

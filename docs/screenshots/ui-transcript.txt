@@ -1,0 +1,18 @@
+PASS  client-side validation shows both field errors
+PASS  loading state is shown and honest ('can take a few seconds')
+PASS  submit button is disabled while in flight
+PASS  result shows category water
+PASS  result shows priority high
+PASS  result shows the AI summary line
+PASS  result shows which provider produced it
+PASS  dashboard lists complaints
+PASS  newest complaint (the one just submitted) is first
+PASS  pagination text present
+PASS  category filter shows only water rows
+PASS  valid transition open -> in_progress is applied
+PASS  invalid transition surfaces the server's own 409 message verbatim
+PASS  stats shows category counts
+PASS  stats shows priority counts
+PASS  second stats request is served from cache (X-Cache HIT shown)
+first stats view showed cache=MISS
+PASS=16 FAIL=0

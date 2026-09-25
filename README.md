@@ -49,6 +49,17 @@ docker compose up --build
 ```
 Open http://localhost:8080 (UI) and http://localhost:8000/docs (API docs, dev stack only). The backend runs migrations and seeds 30+ sample complaints on first start; the seed is idempotent.
 
+## Screenshots
+Real screenshots of the running stack (headless Chromium driving the Compose quickstart on a CI runner; details and caveats in [docs/evidence/ui-run.md](docs/evidence/ui-run.md)).
+
+| Submit: result of AI triage | Dashboard: server's 409 message shown verbatim |
+|---|---|
+| ![Submit result](docs/screenshots/04-submit-result.png) | ![Dashboard 409](docs/screenshots/08-dashboard-409-server-message.png) |
+
+| Submit: in-flight state (response delayed 2.5 s to make it visible) | Stats: cache HIT |
+|---|---|
+| ![Loading](docs/screenshots/03-submit-loading-delayed-2.5s.png) | ![Stats](docs/screenshots/10-stats-cache-hit.png) |
+
 ## Configuration
 Everything comes from environment variables (see `.env.example`); nothing secret is committed.
 
@@ -56,7 +67,7 @@ Everything comes from environment variables (see `.env.example`); nothing secret
 |---|---|
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | database credentials; `.env` is gitignored |
 | `DATABASE_URL`, `REDIS_URL` | must use the service names `postgres` and `redis` in Compose/Kubernetes, not `localhost` |
-| `TRIAGE_PROVIDER` | `simulated` (code default), `rules`, `ollama`, `llm` |
+| `TRIAGE_PROVIDER` | `.env.example` sets `rules` (keyword rules, no key needed); the code default is `simulated` (hash-based fake for tests: its labels are meaningless), or `ollama`, `llm` |
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_VENDOR` | for `llm` (`groq` or `gemini`). With an empty key the backend serves `rules` and logs a warning |
 | `OLLAMA_BASE_URL`, `OLLAMA_MODEL` | for `ollama` (`--profile ollama`) |
 | `RATE_LIMIT_PER_MINUTE` | per-client limit on `POST /api/complaints` (default 20) |
