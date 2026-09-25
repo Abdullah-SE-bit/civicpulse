@@ -86,6 +86,20 @@ check "some requests were rate limited" test "$limited" -gt 0
 check "429 carries Retry-After" test -n "$ra"
 check "a different client is not limited" test "$(post 'Garbage piled up near the market for days' 203.0.113.99)" = 201
 
+say "8b. the limiter cannot be bypassed by a spoofed X-Forwarded-For (through the frontend proxy)"
+# nginx APPENDS the real peer to whatever the client sends, so a client that rotates a fake first hop must still be limited.
+# This is the check step 8 could not make: it posts straight to the backend. Needs the last-hop fix (PR #46).
+docker compose exec -T redis redis-cli flushall >/dev/null
+sp_ok=0; sp_lim=0
+for i in $(seq 1 30); do
+  c=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$FRONT/api/complaints" -H 'Content-Type: application/json'       -H "X-Forwarded-For: 10.9.9.$i" -d '{"text":"Streetlight not working near the bus stop for a week","location":"Main Road"}')
+  [ "$c" = 201 ] && sp_ok=$((sp_ok+1)); [ "$c" = 429 ] && sp_lim=$((sp_lim+1))
+done
+echo "30 POSTs via the proxy with rotating spoofed first hops: $sp_ok x 201, $sp_lim x 429"
+echo "limiter keys in redis:"; docker compose exec -T redis redis-cli --scan --pattern 'rl:*' | tr -d '' | sort | head -5
+check "spoofed first hops do not evade the limit" test "$sp_lim" -gt 0
+check "spoofed hops share one limiter key" bash -c "[ \"$(docker compose exec -T redis redis-cli --scan --pattern 'rl:*' | wc -l)\" -le 2 ]"
+
 say "9. network isolation"
 run docker network ls --format '{{.Name}}\t{{.Driver}}\tinternal={{.Internal}}' | grep civicpulse
 for n in edge internal; do run docker network inspect "civicpulse_$n" --format '{{.Name}} internal={{.Internal}} members={{range .Containers}}{{.Name}} {{end}}'; done

@@ -1,6 +1,6 @@
 # Runbook
 
-> **Status of this document:** the Compose commands (`up`, `down` without `-v`, `stop`/`start redis`, `kill -s SIGTERM`, the health/readiness/metrics curls) were exercised by `scripts/evidence_compose.sh` on a GitHub runner, see `docs/evidence/compose-run.md`. **The Kubernetes commands have not been run**: no cluster has been available. Correct this file the first time one does not behave as written.
+> **Status of this document:** the Compose commands were exercised by `scripts/evidence_compose.sh` (`docs/evidence/compose-run.md`) and the Kubernetes apply, probe, pod-delete, scale-to-zero, `top`, HPA and VPA commands by `scripts/evidence_k8s.sh` on a kind cluster (`docs/evidence/k8s-run.md`), both on GitHub runners. **Not yet run:** `kubectl rollout undo` and the other procedures in `ROLLBACK.md`, `kubectl set image` under load, and anything against a cluster that is not kind. Correct this file the first time a command does not behave as written.
 
 Service names: `frontend` (nginx, port 8080), `backend` (FastAPI, 8000), `postgres` (5432), `redis` (6379), optional `ollama` (11434). Kubernetes namespace: `civicpulse`.
 
