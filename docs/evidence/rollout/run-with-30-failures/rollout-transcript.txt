@@ -1,0 +1,181 @@
+
+=== environment
+$ kubectl version --short
+error: unknown flag: --short
+See 'kubectl version --help' for usage.
+$ kubectl version
+Client Version: v1.35.0
+Kustomize Version: v5.7.1
+Server Version: v1.37.0
+Warning: version difference between client (1.35) and server (1.37) exceeds the supported minor version skew of +/-1
+
+=== 0. starting state
+$ k get deploy backend -o wide
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                           SELECTOR
+backend   2/2     2            2           26s   backend      ghcr.io/abdullah-se-bit/civicpulse-backend:dev   app=backend
+strategy: {"rollingUpdate":{"maxSurge":1,"maxUnavailable":0},"type":"RollingUpdate"}
+terminationGracePeriodSeconds: 30, preStop: {"exec":{"command":["sleep","10"]}}
+image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev
+PASS  starts on the :dev tag
+
+=== 1. start k6: 25 req/s for 300 s through the Ingress
+k6 started 06:47:30
+
+=== 2. rolling update: kubectl set image (same image, new tag dev-v2)
+t=06:47:50
+$ k set image deployment/backend backend=ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+deployment.apps/backend image updated
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+t=06:48:03 image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+$ k get rs -l app=backend
+NAME                 DESIRED   CURRENT   READY   AGE
+backend-548cdd8769   2         2         2       13s
+backend-6966945c84   0         0         0       59s
+PASS  rollout switched the image to dev-v2
+
+=== 3. rollback mechanism 1: kubectl rollout undo
+t=06:48:18
+$ k rollout history deployment/backend
+deployment.apps/backend 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+$ k rollout undo deployment/backend
+deployment.apps/backend rolled back
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+t=06:48:32 image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev
+PASS  undo restored the :dev tag
+
+=== 4. rollback mechanism 2: re-apply the overlay with an image tag (declarative)
+-- roll FORWARD by applying the overlay pinned to dev-v2 (t=06:48:47)
+$ bash -c kustomize build . | kubectl apply -f -
+namespace/civicpulse unchanged
+configmap/civicpulse-config unchanged
+service/backend unchanged
+service/frontend unchanged
+service/postgres unchanged
+service/redis unchanged
+persistentvolumeclaim/redis-data unchanged
+deployment.apps/backend configured
+deployment.apps/frontend unchanged
+deployment.apps/redis unchanged
+statefulset.apps/postgres configured
+poddisruptionbudget.policy/backend configured
+horizontalpodautoscaler.autoscaling/backend unchanged
+ingress.networking.k8s.io/civicpulse unchanged
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev-v2
+-- roll BACK by applying the overlay pinned to the previous tag dev (t=06:49:10)
+$ bash -c kustomize build . | kubectl apply -f -
+namespace/civicpulse unchanged
+configmap/civicpulse-config unchanged
+service/backend unchanged
+service/frontend unchanged
+service/postgres unchanged
+service/redis unchanged
+persistentvolumeclaim/redis-data unchanged
+deployment.apps/backend configured
+deployment.apps/frontend unchanged
+deployment.apps/redis unchanged
+statefulset.apps/postgres configured
+poddisruptionbudget.policy/backend configured
+horizontalpodautoscaler.autoscaling/backend unchanged
+ingress.networking.k8s.io/civicpulse unchanged
+$ k rollout status deployment/backend --timeout=240s
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "backend" rollout to finish: 1 old replicas are pending termination...
+deployment "backend" successfully rolled out
+image now: ghcr.io/abdullah-se-bit/civicpulse-backend:dev
+PASS  declarative re-apply restored :dev
+
+=== 5. wait for k6 to finish and read its measured result
+    ✗ status 200
+      ↳  99% — ✓ 7471 / ✗ 30
+    HTTP
+    http_req_duration..............: avg=6.17ms min=335.91µs med=5.94ms max=105.61ms p(90)=6.78ms p(95)=7.35ms
+      { expected_response:true }...: avg=6.19ms min=4.4ms    med=5.94ms max=105.61ms p(90)=6.78ms p(95)=7.35ms
+    http_req_failed................: 0.39%  30 out of 7501
+    http_reqs......................: 7501   25.00275/s
+    EXECUTION
+    iteration_duration.............: avg=6.38ms min=438.56µs med=6.15ms max=105.84ms p(90)=7.02ms p(95)=7.6ms 
+    iterations.....................: 7501   25.00275/s
+    vus............................: 0      min=0          max=0 
+    vus_max........................: 20     min=20         max=20
+    NETWORK
+    data_received..................: 71 MB  237 kB/s
+    data_sent......................: 848 kB 2.8 kB/s
+running (5m00.0s), 000/020 VUs, 7501 complete and 0 interrupted iterations
+steady ✓ [ 100% ] 000/020 VUs  5m0s  25.00 iters/s
+requests=7501 failed(http_req_failed)=30 check_failures=30 dropped=0
+{"avg_ms":6.176088846953724,"p95_ms":7.356712,"max_ms":105.61657}
+FAIL  zero failed requests during roll-forward, undo and re-apply
+-- pod churn during the run (kubectl get pods -w, last 40 lines)
+backend-6966945c84-vl2xw   0/1     Completed         0          45s
+backend-6966945c84-vl2xw   0/1     Completed         0          46s
+backend-6966945c84-vl2xw   0/1     Completed         0          46s
+backend-6966945c84-vl2xw   0/1     Completed         0          46s
+backend-6966945c84-d6nmj   0/1     Completed         0          46s
+backend-6966945c84-d6nmj   0/1     Completed         0          46s
+backend-6966945c84-d6nmj   0/1     Completed         0          46s
+backend-6966945c84-d6nmj   0/1     Completed         0          46s
+backend-6966945c84-rrpz7   0/1     Pending           0          0s
+backend-6966945c84-rrpz7   0/1     Pending           0          0s
+backend-6966945c84-rrpz7   0/1     Init:0/1          0          0s
+backend-6966945c84-rrpz7   0/1     Init:0/1          0          1s
+backend-6966945c84-rrpz7   0/1     Init:0/1          0          1s
+backend-6966945c84-rrpz7   0/1     PodInitializing   0          3s
+backend-6966945c84-rrpz7   0/1     Running           0          3s
+backend-6966945c84-rrpz7   0/1     Running           0          5s
+backend-6966945c84-rrpz7   0/1     Running           0          7s
+backend-6966945c84-rrpz7   1/1     Running           0          7s
+backend-868c485ccb-7dprd   1/1     Terminating       0          24s
+backend-868c485ccb-7dprd   1/1     Terminating       0          24s
+backend-6966945c84-q2vkm   0/1     Pending           0          0s
+backend-6966945c84-q2vkm   0/1     Pending           0          0s
+backend-6966945c84-q2vkm   0/1     Init:0/1          0          0s
+backend-6966945c84-q2vkm   0/1     Init:0/1          0          0s
+backend-6966945c84-q2vkm   0/1     Init:0/1          0          0s
+backend-6966945c84-q2vkm   0/1     PodInitializing   0          3s
+backend-6966945c84-q2vkm   0/1     Running           0          3s
+backend-6966945c84-q2vkm   0/1     Running           0          4s
+backend-6966945c84-q2vkm   0/1     Running           0          6s
+backend-6966945c84-q2vkm   1/1     Running           0          6s
+backend-868c485ccb-vgtz7   1/1     Terminating       0          37s
+backend-868c485ccb-vgtz7   1/1     Terminating       0          37s
+backend-868c485ccb-7dprd   0/1     Completed         0          35s
+backend-868c485ccb-7dprd   0/1     Completed         0          35s
+backend-868c485ccb-7dprd   0/1     Completed         0          35s
+backend-868c485ccb-7dprd   0/1     Completed         0          35s
+backend-868c485ccb-vgtz7   0/1     Completed         0          48s
+backend-868c485ccb-vgtz7   0/1     Completed         0          48s
+backend-868c485ccb-vgtz7   0/1     Completed         0          48s
+backend-868c485ccb-vgtz7   0/1     Completed         0          48s
+$ k get pods -l app=backend -o wide
+NAME                       READY   STATUS    RESTARTS   AGE     IP            NODE                       NOMINATED NODE   READINESS GATES
+backend-6966945c84-q2vkm   1/1     Running   0          3m12s   10.244.0.23   civicpulse-control-plane   <none>           <none>
+backend-6966945c84-rrpz7   1/1     Running   0          3m19s   10.244.0.22   civicpulse-control-plane   <none>           <none>
+
+=== summary
+PASS=4 FAIL=1
