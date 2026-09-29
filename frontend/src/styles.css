@@ -87,6 +87,9 @@ button:disabled { cursor: wait; }
   font-weight: 650;
 }
 .service-status i { width: 7px; height: 7px; border-radius: 50%; background: #42a574; box-shadow: 0 0 0 3px #d9efe3; }
+/* pulsing service status dot */
+.service-status i { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 3px #d9efe3; } 50% { box-shadow: 0 0 0 6px rgba(217, 239, 227, .35); } }
 
 .page-wrap { padding: 44px 0 72px; }
 .eyebrow { margin: 0 0 14px; color: #6e7b75; font-size: 13px; font-weight: 650; }
