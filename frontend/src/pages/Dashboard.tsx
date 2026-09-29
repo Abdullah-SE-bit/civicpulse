@@ -11,88 +11,100 @@ export function Dashboard() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState<ComplaintPage | null>(null);
   const [error, setError] = useState("");
-  const [reload, setReload] = useState(0); // bump to refetch after a status change
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    let stale = false; // ignore a slow response that arrives after the filters changed
+    let stale = false;
     listComplaints({ page, page_size: PAGE_SIZE, ...filters })
-      .then((d) => {
+      .then((response) => {
         if (stale) return;
-        setData(d);
+        setData(response);
         setError("");
       })
-      .catch((e: Error) => {
-        if (!stale) setError(e.message);
+      .catch((requestError: Error) => {
+        if (!stale) setError(requestError.message);
       });
-    return () => {
-      stale = true;
-    };
+    return () => { stale = true; };
   }, [page, filters, reload]);
 
-  // The server owns the state machine; on an invalid transition we show its 409 message verbatim.
   async function advance(id: string, status: Status) {
     try {
       await setStatus(id, status);
-      setReload((n) => n + 1);
-    } catch (e) {
-      setError((e as Error).message);
+      setReload((value) => value + 1);
+    } catch (requestError) {
+      setError((requestError as Error).message);
     }
   }
 
-  const filter = (k: keyof typeof filters, options: readonly string[]) => (
-    <select
-      aria-label={k}
-      value={filters[k]}
-      onChange={(e) => {
-        setPage(1);
-        setFilters({ ...filters, [k]: e.target.value });
-      }}
-    >
-      <option value="">all {k}</option>
-      {options.map((o) => <option key={o}>{o}</option>)}
-    </select>
+  const filter = (key: keyof typeof filters, options: readonly string[]) => (
+    <label className="filter-control" key={key}>
+      <span>{key}</span>
+      <select
+        aria-label={key}
+        value={filters[key]}
+        onChange={(event) => {
+          setPage(1);
+          setFilters({ ...filters, [key]: event.target.value });
+        }}
+      >
+        <option value="">All {key}</option>
+        {options.map((option) => <option key={option}>{option}</option>)}
+      </select>
+    </label>
   );
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
 
   return (
-    <section>
-      <h2>Dashboard</h2>
-      <div className="filters">
+    <section className="data-page">
+      <div className="data-page-heading">
+        <div>
+          <p className="section-kicker">Operations</p>
+          <h2>Cases</h2>
+          <p>Review incoming reports and update their progress.</p>
+        </div>
+        <span className="case-total">{data?.total ?? 0} reports</span>
+      </div>
+
+      <div className="filters" aria-label="Case filters">
         {filter("category", CATEGORIES)}
         {filter("priority", PRIORITIES)}
         {filter("status", STATUSES)}
       </div>
-      {error && <p role="alert" className="err">{error}</p>}
-      {!data && !error ? <p>Loading…</p> : (
-        <table>
-          <thead>
-            <tr><th>Summary</th><th>Location</th><th>Category</th><th>Priority</th><th>Status</th><th>Triaged by</th></tr>
-          </thead>
-          <tbody>
-            {data?.items.map((c) => (
-              <tr key={c.id}>
-                <td title={c.text}>{c.ai_summary ?? c.text.slice(0, 80)}</td>
-                <td>{c.location}</td>
-                <td>{c.category}</td>
-                <td>{c.priority}</td>
-                <td>
-                  <select aria-label="status" value={c.status} onChange={(e) => advance(c.id, e.target.value as Status)}>
-                    {STATUSES.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td><code>{c.triaged_by}</code></td>
-              </tr>
-            ))}
-            {data?.items.length === 0 && <tr><td colSpan={6}>No complaints match.</td></tr>}
-          </tbody>
-        </table>
+
+      {error && <p role="alert" className="err server-error">{error}</p>}
+      {!data && !error ? <p className="loading-copy">Loading cases...</p> : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Summary</th><th>Location</th><th>Category</th><th>Priority</th><th>Status</th><th>Triaged by</th></tr>
+            </thead>
+            <tbody>
+              {data?.items.map((complaint) => (
+                <tr key={complaint.id}>
+                  <td title={complaint.text}>{complaint.ai_summary ?? complaint.text.slice(0, 80)}</td>
+                  <td>{complaint.location}</td>
+                  <td><span className="table-tag">{complaint.category}</span></td>
+                  <td><span className={`priority-tag priority-${complaint.priority}`}>{complaint.priority}</span></td>
+                  <td>
+                    <select aria-label="status" value={complaint.status} onChange={(event) => advance(complaint.id, event.target.value as Status)}>
+                      {STATUSES.map((status) => <option key={status}>{status}</option>)}
+                    </select>
+                  </td>
+                  <td><code>{complaint.triaged_by}</code></td>
+                </tr>
+              ))}
+              {data?.items.length === 0 && <tr><td colSpan={6} className="empty-cell">No complaints match these filters.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       )}
-      <p>
-        <button disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</button>{" "}
-        Page {page} of {pages} ({data?.total ?? 0} total){" "}
-        <button disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
-      </p>
+
+      <div className="pagination" aria-label="Pagination">
+        <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
+        <span>Page {page} of {pages} ({data?.total ?? 0} total)</span>
+        <button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
+      </div>
     </section>
   );
 }
