@@ -60,6 +60,8 @@ button:disabled { cursor: wait; }
   font-size: 21px;
   font-weight: 700;
 }
+/* gradient brand mark */
+.brand-mark { background: linear-gradient(135deg, #2a6b75, #1d4d56 60%, #163f48); box-shadow: 0 4px 10px rgba(29, 77, 86, .28); }
 
 .brand-copy { display: grid; line-height: 1.1; }
 .brand-copy strong { font-size: 16px; letter-spacing: -.02em; }
