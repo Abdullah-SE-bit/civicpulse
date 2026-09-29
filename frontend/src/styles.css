@@ -194,6 +194,9 @@ textarea:focus, input:focus, select:focus { border-color: #4f897d; box-shadow: 0
 }
 .primary-button:hover:not(:disabled) { background: #163f48; transform: translateY(-1px); box-shadow: 0 8px 15px rgba(29, 77, 86, .22); }
 .primary-button:disabled { opacity: .72; }
+/* gradient primary button with press state */
+.primary-button { border-radius: 10px; background: linear-gradient(180deg, #23606b, #1d4d56); }
+.primary-button:active:not(:disabled) { transform: translateY(0) scale(.98); box-shadow: 0 2px 6px rgba(29, 77, 86, .2); }
 .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 .server-error { padding: 11px 12px; border-radius: 6px; background: #fff0ee; }
 
