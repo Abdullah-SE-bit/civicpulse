@@ -16,6 +16,9 @@ body {
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: wait; }
+/* smooth scrolling and brand text selection */
+html { scroll-behavior: smooth; }
+::selection { background: #bfdcd3; color: #10322d; }
 
 .site-header {
   border-bottom: 1px solid #d9ddd8;
