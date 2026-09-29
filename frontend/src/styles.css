@@ -79,6 +79,9 @@ button:disabled { cursor: wait; }
   transition: color .16s ease, background-color .16s ease;
 }
 .primary-nav button:hover { color: #17222b; background: #e9eeea; }
+/* nav pill hover lift */
+.primary-nav button { border-radius: 999px; padding: 8px 14px; }
+.primary-nav button:active { transform: scale(.97); }
 .primary-nav button[aria-current="page"] { color: #173f48; background: #dbe9e5; }
 
 .service-status {
