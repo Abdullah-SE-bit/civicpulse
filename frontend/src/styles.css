@@ -256,6 +256,9 @@ tr:last-child td { border-bottom: 0; }
 .stat-card dl div { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid #edf0ec; }
 .stat-card dt { color: #63716a; font-size: 13px; }
 .stat-card dd { margin: 0; color: #294b44; font-size: 14px; font-weight: 750; }
+/* stat card hover lift */
+.stat-card { transition: transform .18s ease, box-shadow .18s ease; }
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(38, 54, 47, .08); }
 
 @keyframes enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
