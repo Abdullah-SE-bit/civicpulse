@@ -278,3 +278,7 @@ tr:last-child td { border-bottom: 0; }
   .report-intro h1 { font-size: 38px; }
   .panel-heading { padding-bottom: 19px; }
 }
+
+/* visible focus rings */
+:focus-visible { outline: 2px solid #4f897d; outline-offset: 2px; border-radius: 6px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
