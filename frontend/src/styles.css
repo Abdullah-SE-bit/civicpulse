@@ -170,6 +170,9 @@ textarea, input, select {
 textarea { min-height: 136px; resize: vertical; line-height: 1.5; }
 textarea::placeholder, input::placeholder { color: #9aa29e; }
 textarea:focus, input:focus, select:focus { border-color: #4f897d; box-shadow: 0 0 0 3px rgba(79, 137, 125, .14); }
+/* input hover and rounded fields */
+textarea, input, select { border-radius: 10px; }
+textarea:hover:not(:focus), input:hover:not(:focus), select:hover:not(:focus) { border-color: #9db7ae; }
 [aria-invalid="true"] { border-color: #c75e52; }
 .field-footer { display: flex; justify-content: space-between; min-height: 20px; }
 .character-count { margin-top: 6px; color: #8b958f; font-size: 11px; }
