@@ -237,6 +237,8 @@ tr:last-child td { border-bottom: 0; }
 .priority-high, .priority-urgent { background: #fae9e4; color: #a44b3d; }
 .priority-medium { background: #f8f0dc; color: #927023; }
 .priority-low { background: #e7f1eb; color: #367156; }
+/* priority tags with status dot */
+.priority-tag::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: currentColor; vertical-align: 1px; }
 .empty-cell { padding: 30px; color: #7a857f; text-align: center; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 18px; color: #69766f; font-size: 12px; }
 .pagination button, .quiet-button { padding: 8px 11px; border: 1px solid #cad4cd; border-radius: 6px; background: #fdfdfb; color: #39584f; font-size: 12px; font-weight: 700; transition: background-color .16s ease, border-color .16s ease; }
