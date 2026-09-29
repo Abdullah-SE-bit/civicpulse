@@ -131,6 +131,8 @@ button:disabled { cursor: wait; }
 }
 .report-note strong { color: #294a45; }
 .note-icon { color: #2d6a5e; font-size: 18px; line-height: 1; }
+/* rounded report note */
+.report-note { border-radius: 0 12px 12px 0; }
 
 .form-panel {
   padding: clamp(25px, 4vw, 38px);
