@@ -6,6 +6,8 @@
 }
 
 * { box-sizing: border-box; }
+/* custom slim scrollbar */
+* { scrollbar-width: thin; scrollbar-color: #b7c4bd transparent; }
 
 body {
   margin: 0;
