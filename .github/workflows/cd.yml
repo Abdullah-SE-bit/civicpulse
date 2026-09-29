@@ -147,11 +147,17 @@ jobs:
       - name: Smoke test through the Ingress
         run: |
           base=http://civicpulse.localtest.me
-          curl -fsS --retry 15 --retry-delay 4 --retry-connrefused --resolve civicpulse.localtest.me:80:127.0.0.1 "$base/" >/dev/null
-          id=$(curl -fsS --resolve civicpulse.localtest.me:80:127.0.0.1 -X POST "$base/api/complaints" \
+          # A Deployment rollout can complete just before its Service endpoints have
+          # propagated to ingress-nginx. Retry every request that crosses the Ingress.
+          curl_ingress() {
+            curl -fsS --retry 15 --retry-delay 2 --retry-all-errors --retry-connrefused \
+              --resolve civicpulse.localtest.me:80:127.0.0.1 "$@"
+          }
+          curl_ingress "$base/" >/dev/null
+          id=$(curl_ingress -X POST "$base/api/complaints" \
             -H 'Content-Type: application/json' \
             -d '{"text":"Streetlight out on Main Road for three nights","location":"Main Road"}' | jq -er .id)
-          curl -fsS --resolve civicpulse.localtest.me:80:127.0.0.1 "$base/api/complaints/$id" | jq -e .category
+          curl_ingress "$base/api/complaints/$id" | jq -e .category
 
       - name: What is running
         if: always()
